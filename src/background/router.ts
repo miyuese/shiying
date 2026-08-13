@@ -41,10 +41,11 @@ import {
   refreshDeadline,
   hasActiveTaskOfType,
 } from './tasks';
-import { putImage, deleteImages, getImage } from './store/db';
+import { putImage, deleteImages, getImage, listImageKeys } from './store/db';
 import { genId, compressImage } from '../shared/utils/image';
 import { storage, KEYS } from './store/storage';
 import { PENDING_IMAGE_READY_EVENT } from '../shared/messages';
+import { TASK_MAX_KEEP } from '../shared/constants';
 import { listErrors, clearErrors, logError } from './store/errorLog';
 
 /** 内部异常 → 中文用户文案 */
@@ -182,7 +183,10 @@ async function handle(msg: MsgEnvelope): Promise<unknown> {
       if (p.intent === 'personCard' && (await hasActiveTaskOfType('personCard'))) throw new Error('PERSON_CARD_BUSY');
       const taskType = p.intent === 'faceswap' ? 'faceswap' : p.intent === 'suite' ? 'suite' : p.intent === 'personCard' ? 'personCard' : 'redraw';
       const task = await createTask(taskType, { ...p });
-      void runGenerate(task.id, p);
+      // 再生成资产：把 dataURL 输入图落盘为持久 blob（成功/失败都不删），
+      // 结果栏「再生成」据此用相同配置重新生成；task.inputs 以 blobKey 引用替代 dataURL（不占配额）
+      const resolved = await persistRegenInputs(task.id, p);
+      void runGenerate(task.id, resolved);
       return { taskId: task.id };
     }
 
@@ -359,6 +363,83 @@ function isInjectableUrl(url: string | undefined): boolean {
 function isTimeout(err: unknown): boolean {
   const e = err as { code?: string; message?: string };
   return e?.code === 'TIMEOUT' || e?.message === 'TIMEOUT';
+}
+
+/* ---- 再生成资产：源图/人脸图落盘 + GC ----
+ * 生成请求里的 sourceRef/faceRef 是 dataURL，会被 sanitizeTask 在落库时剥掉（保护配额），
+ * 临时 blob 在生成完成后也会被删 —— 任务记录里不剩输入图，结果栏「再生成」无从复用。
+ * 方案：创建任务时把 dataURL 转存为持久 blob（key 带 regen- 前缀），写入 task.inputs 引用，
+ * 并标记 keepSourceBlob=true（成功/失败都不删，由 GC 按最近 N 个任务统一回收）。
+ */
+const REGEN_SRC_PREFIX = 'regen-src:';
+const REGEN_FACE_PREFIX = 'regen-face:';
+const REGEN_KEEP = 10; // 只保留最近 10 个任务的再生成输入图
+
+async function persistRegenInputs(taskId: string, p: GeneratePayload): Promise<GeneratePayload> {
+  const resolved: GeneratePayload = { ...p };
+  const newKeys: string[] = [];
+  try {
+    if (!resolved.sourceBlobKey && resolved.sourceRef?.startsWith('data:')) {
+      const key = `${REGEN_SRC_PREFIX}${taskId}`;
+      await putImage(key, await toBlob(resolved.sourceRef));
+      resolved.sourceBlobKey = key;
+      resolved.sourceRef = undefined;
+      newKeys.push(key);
+    }
+    if (!resolved.faceBlobKey && resolved.faceRef?.startsWith('data:')) {
+      const key = `${REGEN_FACE_PREFIX}${taskId}`;
+      await putImage(key, await toBlob(resolved.faceRef));
+      resolved.faceBlobKey = key;
+      resolved.faceRef = undefined;
+      newKeys.push(key);
+    }
+  } catch {
+    /* 落盘失败不阻塞生成，仅失去「再生成」能力 */
+  }
+  if (newKeys.length > 0) {
+    // 输入图是再生成资产：成功/失败都不删（临时图生命周期结束，由 GC 统一回收）
+    resolved.keepSourceBlob = true;
+    // 同步 task.inputs：以 blobKey 引用替代 dataURL（不再被 sanitize 剥掉，也不占配额）
+    await updateTask(taskId, { inputs: { ...resolved } }).catch(() => {});
+    await pruneRegenBlobs();
+  }
+  return resolved;
+}
+
+/** GC：只保留最近 REGEN_KEEP 个任务的再生成输入图，更旧的清掉（防本地无限膨胀） */
+async function pruneRegenBlobs(): Promise<void> {
+  try {
+    const all = await listTasks(TASK_MAX_KEEP); // 覆盖全部可及任务（超出 50 的已被裁剪）
+    const referenced = new Set<string>();
+    const keepIds = new Set(all.slice(0, REGEN_KEEP).map((t) => t.id));
+    for (const t of all) {
+      const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string };
+      if (typeof inputs.sourceBlobKey === 'string' && inputs.sourceBlobKey.startsWith(REGEN_SRC_PREFIX)) {
+        referenced.add(inputs.sourceBlobKey);
+      }
+      if (typeof inputs.faceBlobKey === 'string' && inputs.faceBlobKey.startsWith(REGEN_FACE_PREFIX)) {
+        referenced.add(inputs.faceBlobKey);
+      }
+    }
+    const stale: string[] = [];
+    // 孤儿：任务已被裁剪（超出 TASK_MAX_KEEP）→ blob 没有任务引用，直接清
+    for (const key of await listImageKeys(REGEN_SRC_PREFIX)) if (!referenced.has(key)) stale.push(key);
+    for (const key of await listImageKeys(REGEN_FACE_PREFIX)) if (!referenced.has(key)) stale.push(key);
+    // 超出保留数量：任务还在，但输入图该回收了
+    for (const t of all) {
+      if (keepIds.has(t.id)) continue;
+      const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string };
+      if (typeof inputs.sourceBlobKey === 'string' && inputs.sourceBlobKey.startsWith(REGEN_SRC_PREFIX)) {
+        stale.push(inputs.sourceBlobKey);
+      }
+      if (typeof inputs.faceBlobKey === 'string' && inputs.faceBlobKey.startsWith(REGEN_FACE_PREFIX)) {
+        stale.push(inputs.faceBlobKey);
+      }
+    }
+    if (stale.length) await deleteImages([...new Set(stale)]).catch(() => {});
+  } catch {
+    /* 忽略 */
+  }
 }
 
 /**

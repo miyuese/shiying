@@ -97,7 +97,7 @@ export function renderAnalyzeView(container: HTMLElement): void {
     }
     const btn = container.querySelector('#btn-reverse') as HTMLButtonElement;
     btn.disabled = true;
-    btn.textContent = '反推中…';
+    btn.textContent = '反推中…（较慢，约 15~60 秒）';
     try {
       const profileId = (getState().settings?.reverseApi.profileId as ProfileId) ?? DEFAULT_PROFILE_ID;
       const res = await send<{ prompt: string; charCount: number }>('analyze-image', {

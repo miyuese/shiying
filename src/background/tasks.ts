@@ -130,10 +130,10 @@ export async function refreshDeadline(id: string): Promise<Task | undefined> {
   return task;
 }
 
-/** 更新任务状态 */
+/** 更新任务状态（inputs 用于把 dataURL 换成 blobKey 引用，供结果栏「再生成」复用） */
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<Task, 'status' | 'result' | 'error' | 'progress'>>
+  patch: Partial<Pick<Task, 'status' | 'result' | 'error' | 'progress' | 'inputs'>>
 ): Promise<Task | undefined> {
   const tasks = await loadTasks();
   const idx = tasks.findIndex((t) => t.id === id);

@@ -30,7 +30,7 @@ export const ALBUM_PAGE_SIZE = 50;
 export const HOVER_DEBOUNCE_MS = 300;
 
 /** 超时（ms） */
-export const ANALYZE_TIMEOUT = 15000;
+export const ANALYZE_TIMEOUT = 90000; // 90s：视觉模型「看图 + 最多 1200 token 详细描述」，经中转站常超 15s，给足时间（实测建议按 ×2 余量）
 // 生图超时：等「生图服务商返回结果」（同步中转站=等待生成完成）。实测中转站慢时 5~6 分钟，给足 7 分钟内的一半预算
 export const GENERATE_TIMEOUT = 400000;
 // 读取响应体（resp.json 之前的 body 流）超时：响应头到了但 body 迟迟不来时兜底

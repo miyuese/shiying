@@ -98,6 +98,23 @@ export async function hasImage(key: string): Promise<boolean> {
   );
 }
 
+/** 列出全部图片 key（可按前缀过滤）；用于清理孤儿 blob（任务已被裁剪但 blob 还在） */
+export async function listImageKeys(prefix?: string): Promise<string[]> {
+  return withDb((db) =>
+    new Promise<string[]>((resolve, reject) => {
+      const tx = db.transaction(DB_STORE_IMAGES, 'readonly');
+      const store = tx.objectStore(DB_STORE_IMAGES);
+      // IDBKeyRange 按字符串前缀取范围（'regen-' → 'regen-￿' 覆盖所有该前缀 key）
+      const req = prefix
+        ? store.getAllKeys(IDBKeyRange.bound(prefix, prefix + '￿'))
+        : store.getAllKeys();
+      req.onsuccess = () =>
+        resolve((req.result as IDBValidKey[]).filter((k): k is string => typeof k === 'string'));
+      req.onerror = () => reject(req.error);
+    })
+  );
+}
+
 /** 批量删除（相册/人物卡删除时清理 blob） */
 export async function deleteImages(keys: string[]): Promise<void> {
   const valid = keys.filter((k) => typeof k === 'string' && k !== '');

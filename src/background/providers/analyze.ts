@@ -4,10 +4,11 @@
 
 import { getSettings } from '../settings';
 import { getAnalyzeSystemPrompt } from '../../shared/prompts';
-import { ANALYZE_MAX_TOKENS, ANALYZE_TIMEOUT, ERROR_MESSAGES } from '../../shared/constants';
+import { ANALYZE_MAX_TOKENS, ANALYZE_TIMEOUT, BODY_READ_TIMEOUT, ERROR_MESSAGES } from '../../shared/constants';
 import type { ProfileId } from '../../shared/types';
 import {
   apiFetch,
+  readJson,
   classifyHttpError,
   ApiError,
   type ChatCompletionRequest,
@@ -45,6 +46,8 @@ export async function analyzeImage(
   };
 
   const url = `${safeBase}/chat/completions`;
+  // ★ 超时分层：ANALYZE_TIMEOUT 管「等响应头」（90s，给足视觉模型输出时间）；
+  // readJson 管「读响应体」（BODY_READ_TIMEOUT=60s），响应头到了但 body 迟迟不流完时不会无限等
   const resp = await apiFetch(url, {
     method: 'POST',
     headers: {
@@ -54,7 +57,7 @@ export async function analyzeImage(
     body: JSON.stringify(body),
   }, ANALYZE_TIMEOUT);
 
-  const data = (await resp.json().catch(() => ({}))) as ChatCompletionResponse;
+  const data = await readJson<ChatCompletionResponse>(resp, BODY_READ_TIMEOUT, url);
   if (!resp.ok) throw classifyHttpError(resp.status, data);
 
   const prompt = data.choices?.[0]?.message?.content?.trim();
