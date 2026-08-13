@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拾影 ShiYing</title>
+<link rel="stylesheet" href="../shared/styles.css">
+<style>
+  /* 页面级布局（组件样式在 ../shared/styles.css） */
+  body {
+    width: 320px;
+    max-height: 480px;
+    overflow-y: auto;
+  }
+  .popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--hairline);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+  }
+  .content {
+    padding: 14px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px 10px;
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    cursor: pointer;
+    border: 0.5px solid transparent;
+    font-family: var(--font-body);
+    color: var(--ink-2);
+    background: var(--bg-2);
+    transition: transform var(--dur-1) var(--ease-snap),
+      border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out),
+      color var(--dur-2) var(--ease-out);
+  }
+  .action-btn:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: var(--bg-3);
+    color: var(--ink-1);
+  }
+  .action-btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .action-btn .ic {
+    color: var(--ink-2);
+  }
+  .action-btn.primary {
+    background: var(--accent-grad);
+    color: #fff;
+  }
+  .action-btn.primary .ic {
+    color: #fff;
+  }
+  .action-btn.primary:hover:not(:disabled) {
+    background: var(--accent-grad);
+    border-color: transparent;
+  }
+  .action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-2);
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--r-sm);
+    padding: 8px 10px;
+    margin-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="popup-header">
+    <div class="masthead-brand">
+      <div class="logo" style="width:26px;height:26px;border-radius:7px;">影</div>
+      <div class="brand-stack">
+        <span class="masthead-title" style="font-size:15px;">拾影</span>
+        <span class="masthead-kicker">ShiYing · Darkroom</span>
+      </div>
+    </div>
+    <button class="icon-btn" id="btn-options" title="设置" aria-label="设置"><i data-lucide="settings"></i></button>
+  </div>
+
+  <div class="content">
+    <div id="img-preview" style="background:var(--bg-2);border:0.5px solid var(--hairline);border-radius:var(--r-sm);padding:10px;margin-bottom:12px;display:flex;gap:10px;align-items:center;">
+      <div id="thumb" style="width:52px;height:52px;border-radius:var(--r-sm);background:var(--bg-3);border:0.5px solid var(--hairline);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);"><i data-lucide="image"></i></div>
+      <div style="flex:1;min-width:0;">
+        <p style="font-size:12px;color:var(--ink-1);margin:0;font-weight:500;">当前页面图片</p>
+        <p style="font-size:10px;color:var(--ink-3);margin:2px 0 0;" id="img-meta">未检测到可用的图片</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <button class="action-btn primary" id="act-reverse" disabled>
+        <span class="ic"><i data-lucide="wand-sparkles" data-size="18"></i></span><span>反推</span>
+      </button>
+      <button class="action-btn" id="act-swap" disabled>
+        <span class="ic"><i data-lucide="user-round" data-size="18"></i></span><span>换脸</span>
+      </button>
+      <button class="action-btn" id="act-suite" disabled>
+        <span class="ic"><i data-lucide="layout-grid" data-size="18"></i></span><span>拍一套</span>
+      </button>
+      <button class="action-btn" id="act-collect" disabled>
+        <span class="ic"><i data-lucide="plus" data-size="18"></i></span><span>收集</span>
+      </button>
+    </div>
+
+    <p class="section-label">最近任务</p>
+    <div id="tasks">
+      <p style="font-size:11px;color:var(--ink-3);">暂无任务</p>
+    </div>
+  </div>
+
+  <div style="padding:12px 14px;border-top:1px solid var(--hairline);">
+    <button class="btn btn-secondary btn-block" id="btn-panel" style="font-size:13px;">打开完整工作台 →</button>
+  </div>
+
+<script type="module" src="./index.ts"></script>
+</body>
+</html>

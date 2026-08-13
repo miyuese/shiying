@@ -1,0 +1,23 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 本地工具状态
+.workbuddy/
+
+# 环境变量与密钥（防御：任何形如 sk-*.txt 的文件都绝不上传）
+.env
+.env.*
+*.local
+sk-*.txt
+
+# 个人 / 竞品素材（不上传）
+docs/面试素材-问题解决复盘.md
+docs/自研反推方案提示词合集.md
+docs/自研提示词模板记录.md
+
+# 系统文件
+.DS_Store
+Thumbs.db

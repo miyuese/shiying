@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拾影 ShiYing · 产品需求与技术计划书（PRD v1.0）</title>
+<style>
+  :root{
+    --bg:#0f1117; --bg2:#161a24; --bg3:#1d2331;
+    --line:#2a3142; --line2:#3a4358;
+    --text:#e6e9f0; --text2:#a7aec0; --text3:#6b7387;
+    --blue:#5b9bf5; --purple:#a78bfa; --teal:#34d399; --amber:#fbbf24; --coral:#fb7185;
+    --bluebg:rgba(91,155,245,.1); --purplebg:rgba(167,139,250,.1); --tealbg:rgba(52,211,153,.1);
+    --amberbg:rgba(251,191,36,.1); --coralbg:rgba(251,113,133,.1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.8;font-size:15px;}
+  .wrap{max-width:1000px;margin:0 auto;padding:48px 32px 96px;}
+  header.hero{border-bottom:1px solid var(--line);padding-bottom:32px;margin-bottom:40px;}
+  .tag{display:inline-block;font-size:12px;color:var(--blue);background:var(--bluebg);border:1px solid rgba(91,155,245,.35);padding:2px 10px;border-radius:999px;margin-bottom:14px;letter-spacing:.5px;}
+  h1{font-size:30px;font-weight:600;letter-spacing:.5px;}
+  h1 small{display:block;font-size:15px;color:var(--text2);font-weight:400;margin-top:8px;}
+  h2{font-size:21px;font-weight:600;margin:56px 0 18px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  h2 .no{color:var(--blue);font-family:"SF Mono",Consolas,monospace;margin-right:8px;}
+  h3{font-size:16px;font-weight:600;margin:28px 0 12px;}
+  h4{font-size:14.5px;font-weight:600;margin:20px 0 8px;color:var(--text);}
+  p{margin-bottom:12px;color:var(--text2);}
+  strong{color:var(--text);font-weight:600;}
+  code{font-family:"SF Mono",Consolas,monospace;font-size:12.5px;background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--teal);}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;}
+  th{text-align:left;color:var(--text3);font-weight:500;font-size:12.5px;padding:8px 10px;border-bottom:1px solid var(--line2);background:var(--bg3);}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--text2);vertical-align:top;}
+  td:first-child{color:var(--text);font-family:"SF Mono",Consolas,monospace;font-size:12.5px;}
+  ul,ol{padding-left:22px;margin-bottom:12px;color:var(--text2);}
+  li{margin-bottom:6px;}
+  .box{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;}
+  .box.teal{border-color:rgba(52,211,153,.35);background:var(--tealbg);}
+  .box.amber{border-color:rgba(251,191,36,.35);background:var(--amberbg);}
+  .box.coral{border-color:rgba(251,113,133,.35);background:var(--coralbg);}
+  .box.purple{border-color:rgba(167,139,250,.35);background:var(--purplebg);}
+  .box.blue{border-color:rgba(91,155,245,.35);background:var(--bluebg);}
+  .flow{background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-family:"SF Mono",Consolas,monospace;font-size:12.5px;color:var(--text2);margin:10px 0;line-height:2;}
+  .step{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:12px 0;}
+  .step h4{font-size:15px;margin-bottom:8px;}
+  .pill{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;margin:2px 4px 2px 0;border:1px solid;}
+  .pill.blue{color:var(--blue);border-color:rgba(91,155,245,.4);background:var(--bluebg);}
+  .pill.teal{color:var(--teal);border-color:rgba(52,211,153,.4);background:var(--tealbg);}
+  .pill.purple{color:var(--purple);border-color:rgba(167,139,250,.4);background:var(--purplebg);}
+  .pill.amber{color:var(--amber);border-color:rgba(251,191,36,.4);background:var(--amberbg);}
+  .pill.coral{color:var(--coral);border-color:rgba(251,113,133,.4);background:var(--coralbg);}
+  .toc{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:28px 0 8px;font-size:14px;line-height:2.1;}
+  .toc a{color:var(--text2);text-decoration:none;margin-right:16px;}
+  .toc a:hover{color:var(--blue);}
+  .pre{background:var(--bg3);border:1px solid var(--line);border-radius:10px;padding:16px 18px;font-family:"SF Mono",Consolas,monospace;font-size:12.5px;color:var(--text2);line-height:1.9;overflow-x:auto;margin:12px 0;white-space:pre;}
+  .kbd{display:inline-block;background:var(--bg3);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 6px;font-size:12px;color:var(--text);font-family:"SF Mono",monospace;}
+  .foot{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);color:var(--text3);font-size:13px;}
+  @media (max-width:760px){.wrap{padding:28px 18px 60px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">PRD · v1.0 · 2026-08-08 · Chrome 扩展 MV3 · TypeScript + Vite</span>
+  <h1>拾影 ShiYing · 产品需求与技术计划书
+    <small>网页图片 AI 工具：反推提示词 × 换脸 × 双参考重绘 × 拍一套 × 本地素材库（原创重写项目）</small>
+  </h1>
+</header>
+
+<div class="toc">
+  <strong style="color:var(--text);">目录</strong><br>
+  <a href="#s1">01 文档信息</a><a href="#s2">02 项目概述</a><a href="#s3">03 用户与场景</a><a href="#s4">04 功能需求详述</a>
+  <a href="#s5">05 非功能需求</a><a href="#s6">06 技术架构</a><a href="#s7">07 技术栈详述</a><a href="#s8">08 API 对接规格</a>
+  <a href="#s9">09 核心数据流</a><a href="#s10">10 开发里程碑</a><a href="#s11">11 测试计划</a><a href="#s12">12 风险与合规</a><a href="#s13">13 MVP 验收标准</a>
+</div>
+
+<!-- ================= 01 ================= -->
+<h2 id="s1"><span class="no">01</span>文档信息</h2>
+<table>
+  <tr><td>产品名</td><td>拾影 ShiYing</td></tr>
+  <tr><td>文档版本</td><td>v1.0（待评审）</td></tr>
+  <tr><td>日期</td><td>2026-08-08</td></tr>
+  <tr><td>产品形态</td><td>Chrome 扩展（Manifest V3），固定于浏览器工具栏</td></tr>
+  <tr><td>技术栈</td><td>TypeScript + Vite（无后端依赖，仅自定义 API 直连）</td></tr>
+  <tr><td>状态</td><td>方案已与产品方确认，本 PRD 评审通过后进入 M1 开发</td></tr>
+</table>
+
+<!-- ================= 02 ================= -->
+<h2 id="s2"><span class="no">02</span>项目概述</h2>
+
+<h3>2.1 背景与定位</h3>
+<p>受同类工具启发，从零原创重写一款面向内容创作者的网页图片 AI 工具。核心价值一句话：<strong>「在任意网页上，把一张好图变成属于你的新图」</strong>——识别图中灵感（反推提示词）、换脸、按参考重绘、拍一套，并把过程沉淀为本地素材。</p>
+
+<h3>2.2 目标用户</h3>
+<ul>
+  <li>内容创作者 / 自媒体人：需要灵感复刻、人像素材创作</li>
+  <li>设计师与运营：需要快速生成风格化配图</li>
+  <li>AI 绘画爱好者：需要高质量人脸参考与提示词工作流</li>
+</ul>
+
+<h3>2.3 范围</h3>
+<div class="box teal"><strong>本版本做（MVP）：</strong>
+  <ul style="margin-top:6px;margin-bottom:0;">
+    <li>网页悬浮双按钮（打开插件 / 收集图片）+ 弹窗快捷入口 + 侧边栏工作台</li>
+    <li>人物卡（上传建模、多卡管理、默认卡）</li>
+    <li>三大生成功能：直接换脸 / 反推+双参考重绘 / 拍一套（2×2 四宫格）</li>
+    <li>反推提示词展示与编辑、结果区（再生成/下载/存相册/复制 prompt）</li>
+    <li>极简本地相册（收集 + 生成记录）</li>
+    <li>自定义 API 设置（反推/生图分开配，支持 Base URL / Key / 模型名）</li>
+  </ul>
+</div>
+<div class="box coral"><strong>本版本不做：</strong>
+  <ul style="margin-top:6px;margin-bottom:0;">
+    <li>账号体系 / 积分计费 / License 授权（原版商业功能）</li>
+    <li>多 Provider 目录化适配（仅 gpt-image、gpt-image 系列 + 任意反推模型）</li>
+    <li>背景图识别（仅 &lt;img&gt;）、人脸圈选、语义搜索、多语言、云端同步</li>
+    <li>水印功能（用户明确不要，保生成质量）</li>
+  </ul>
+</div>
+
+<h3>2.4 成功指标（MVP 阶段）</h3>
+<table>
+  <tr><th>指标</th><th>目标</th><th>衡量方式</th></tr>
+  <tr><td>反推成功</td><td>≥ 90%</td><td>反推请求无错误返回率</td></tr>
+  <tr><td>生图成功</td><td>≥ 80%</td><td>生成任务最终产出图片率（含重试）</td></tr>
+  <tr><td>全链路耗时</td><td>单次反推 &lt; 15s</td><td>从点按钮到出 prompt</td></tr>
+  <tr><td>崩溃/报错</td><td>无未捕获异常</td><td>SW / content 控制台无红色报错</td></tr>
+</table>
+
+<!-- ================= 03 ================= -->
+<h2 id="s3"><span class="no">03</span>用户与核心场景</h2>
+
+<div class="step">
+  <h4>场景 1 · 反推 + 双参考重绘（核心闭环）</h4>
+  <p>用户刷到一张喜欢的图 → 悬停点「打开拾影」→ 工作台里点「反推」→ 得到可编辑的中文提示词 → 选一张人物卡（人脸参考）→ 点「生成」→ 得到「保持原图构图、换成自己/指定人脸」的新图 → 下载或存相册。</p>
+</div>
+<div class="step">
+  <h4>场景 2 · 直接换脸</h4>
+  <p>用户想把自己换进某张照片 → 选源图 + 选人物卡 → 点「换脸」→ 得到自然融合的换脸图。</p>
+</div>
+<div class="step">
+  <h4>场景 3 · 拍一套写真</h4>
+  <p>用户有一张满意的生成图 → 点「拍一套」→ 得到同一人物四格写真（2×2）→ 下载或继续处理。</p>
+</div>
+
+<!-- ================= 04 ================= -->
+<h2 id="s4"><span class="no">04</span>功能需求详述</h2>
+
+<!-- 4.1 -->
+<h3>4.1 网页悬浮层（content script）</h3>
+<div class="step">
+  <h4>功能描述</h4>
+  <p>在任意网页的 <code>&lt;img&gt;</code> 图片上悬停时，图片右上角弹出两个按钮：「① 打开拾影」「② 收集」。</p>
+  <h4>交互流程</h4>
+  <ol>
+    <li>用户鼠标进入 <code>&lt;img&gt;</code> 可视区域 → 启动 300ms 定时器（防误触）</li>
+    <li>定时器到期且鼠标仍在图片上 → 注入按钮浮层（不修改 DOM 结构，仅挂载 shadow/绝对定位层）</li>
+    <li>点「打开拾影」→ 打开弹窗快捷操作（把当前图带入弹窗）</li>
+    <li>点「收集」→ 发送 <code>image-collect</code> 消息 → 成功 toast「已存入相册」；重复收集提示「已在相册中」</li>
+    <li>鼠标离开图片/页面滚动 → 移除浮层</li>
+  </ol>
+  <h4>边界与约束</h4>
+  <ul>
+    <li>不注入：<code>chrome://</code>、Chrome Web Store、<code>file://</code>（MV3 自动限制）</li>
+    <li>浮层不拦截图片点击（<code>pointer-events</code> 控制，按钮区域除外）</li>
+    <li>同一时刻只允许一个浮层；避免与页面自身 UI 冲突（使用最高 z-index + 隔离样式）</li>
+    <li>图片 URL 归一化（去重键 = URL + 页面 URL）</li>
+  </ul>
+  <h4>验收</h4>
+  <p>在主流网站（微博/小红书/B 站/淘宝）悬停可用；快速划过不误弹；收集 2 次同一图提示去重。</p>
+</div>
+
+<!-- 4.2 -->
+<h3>4.2 弹窗（popup）</h3>
+<div class="step">
+  <h4>功能描述</h4>
+  <p>点工具栏图标弹出 320×420 小窗：当前页图片快捷操作 + 最近任务状态。</p>
+  <ul>
+    <li>若从悬浮层「打开拾影」进入：自动载入该图片，展示「反推 / 换脸 / 拍一套 / 收集」四个快捷动作</li>
+    <li>显示最近 3 条任务状态（生成中/完成/失败）</li>
+    <li>「打开完整工作台」按钮 → 唤起侧边栏（side panel）</li>
+    <li>「设置」入口</li>
+  </ul>
+</div>
+
+<!-- 4.3 -->
+<h3>4.3 侧边栏工作台（side panel · 主界面）</h3>
+<div class="step">
+  <h4>布局（自上而下）</h4>
+  <ol>
+    <li>顶部栏：Logo「拾影」+ 连接状态点（Key 未配=黄，已配=绿）+ 设置入口</li>
+    <li>Tab 栏：<span class="pill blue">反推重绘</span><span class="pill blue">换脸</span><span class="pill blue">拍一套</span><span class="pill amber">相册</span><span class="pill purple">人物卡</span></li>
+    <li>内容区：当前 Tab 视图</li>
+    <li>底部全局：<strong>结果区</strong>（生成结果卡片，常驻）</li>
+  </ol>
+  <h4>通用组件</h4>
+  <ul>
+    <li><strong>图片选择器</strong>：来源切换（网页收集图 / 相册 / 上传文件），带缩略图网格</li>
+    <li><strong>人物卡选择器</strong>：下拉/卡片列表，默认选中「默认卡」</li>
+    <li><strong>任务状态条</strong>：loading 动画 + 进度文案 + 失败重试按钮</li>
+    <li><strong>结果卡片</strong>：大图 + 操作条（再生成 / 下载 / 存相册 / 复制 prompt / 拍一套）</li>
+  </ul>
+</div>
+
+<!-- 4.4 -->
+<h3>4.4 功能 B · 反推 + 双参考重绘（核心）</h3>
+<div class="step">
+  <h4>输入输出</h4>
+  <ul>
+    <li>输入：构图参考图（= 反推来源图，必选）+ 人脸参考图（从人物卡选，必选）</li>
+    <li>输出：反推中文提示词（可编辑）+ 生成结果图</li>
+  </ul>
+  <h4>详细流程</h4>
+  <ol>
+    <li>选输入图（网页收集/相册/上传）</li>
+    <li>点「反推」→ 调反推模型 → 返回提示词 → 展示在编辑框（<strong>可编辑</strong>）</li>
+    <li>选人物卡（人脸参考）——可选「不选人脸，纯反推」模式</li>
+    <li>点「生成」→ 调生图模型（构图=输入图 + 人脸=人物卡 + prompt）→ 任务进行中</li>
+    <li>成功 → 结果进结果区 → 可下载/存相册/拍一套</li>
+  </ol>
+  <h4>提示词定义</h4>
+  <div class="box amber" style="margin-top:8px;">
+    <p style="color:var(--amber);font-weight:600;margin-bottom:6px;">⚠ 重绘 ≠ 换脸，两者指令不同：</p>
+    <table style="margin:0;font-size:13px;">
+      <tr><th style="width:90px;"></th><th>换脸（功能 A）</th><th>重绘（功能 B）</th></tr>
+      <tr><td>目标</td><td>在<strong>已有源图</strong>上换脸，其他全不变</td><td>生成一张<strong>全新图</strong>，参考构图+人脸</td></tr>
+      <tr><td>指令模板</td><td>4.2 换脸模板原文<br>「以图2作为唯一基础图…严格保留图2的一切…只换脸」</td><td>反推配方 + 重绘使用说明（见下）<br>「根据提示词生成新图，构图参考图指导布局/场景/光线，人脸参考图指导人物身份」</td></tr>
+      <tr><td>图2（构图参考）</td><td>源图 = <strong>保持不变的底图</strong></td><td>构图参考图 = <strong>生成参考，不是底图</strong></td></tr>
+      <tr><td>图1（人脸参考）</td><td>人物卡 = 替换进去的脸</td><td>人物卡 = 生成人物的容貌来源</td></tr>
+      <tr><td>关键区别</td><td>4.2 模板说「严格保留图2的一切」</td><td>重绘不保留任何图，是全新生成</td></tr>
+    </table>
+  </div>
+  <p><strong>反推</strong>：使用反推方案合集（默认「通用快速反推」），由用户在设置中选择方案。</p>
+  <p><strong>换脸指令</strong>：使用《提示词提取记录》4.2 换脸模板原文——以源图为「图2」（唯一基础图，保持不变），人物卡为「图1」（脸部身份来源），prompt 字段 = 反推配方 + 4.2 模板。</p>
+  <p><strong>重绘指令</strong>：prompt 字段 = 反推配方（用户可编辑）+ 重绘使用说明。说明借鉴 4.2 的「双图分工」思路，但<strong>不是 4.2 原文</strong>——因为 4.2 说「以图2作为唯一基础图，严格保留图2的一切」，而重绘是全新生成。重绘使用说明定义为：</p>
+  <div class="pre">根据以下提示词生成一张全新的图片。
+
+构图参考图（= 反推来源图）作为画面布局、场景、构图、镜头角度、光线环境和色彩氛围的参考——但不是底图，最终结果应是全新画面，而非在参考图上修改。
+
+人脸参考图（= 人物卡）作为人物面部身份的来源。生成图片中的人物面部特征（脸型、五官、骨相）应与人物卡一致，但需自然适配新画面的姿态、光线和表情。
+
+提示词（反推配方，用户可编辑）：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[此处插入反推出的提示词，用户可编辑]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+要求：高保真保留人脸参考图的人物识别度，自然融合到提示词描述的场景中。不要贴脸感，肤色和光影适配新场景而非照搬任一参考图。</div>
+</div>
+
+<!-- 4.5 -->
+<h3>4.5 功能 A · 直接换脸</h3>
+<div class="step">
+  <ul>
+    <li>输入：源图（相册/收集/上传）+ 人物卡（人脸）</li>
+    <li>流程：选图 → 选卡 → 点「换脸」→ 生成 → 结果区</li>
+    <li>提示词：参考《提示词提取记录》4.2 换脸模板（图2=源图、图1=人物卡）</li>
+    <li>失败处理：源图无清晰人脸 / 人物卡无效 → 明确报错提示</li>
+  </ul>
+</div>
+
+<!-- 4.6 -->
+<h3>4.6 拍一套（2×2 四宫格）</h3>
+<div class="step">
+  <ul>
+    <li>输入：参考图（通常是刚生成的结果/相册图）+ 人物卡（默认继承当前）</li>
+    <li>流程：选图 → （选卡，可默认）→ 点「拍一套」→ 生成 2×2 大图 → <strong>本地切分为 4 张</strong> → 结果区展示 4 张 + 原大图</li>
+    <li>提示词：参考《提示词提取记录》4.3 拍一套英文模板（一致性最高优先级）</li>
+    <li>切图：<code>canvas</code> 按中心十字裁切 4 块，保留各格独立下载</li>
+  </ul>
+</div>
+
+<!-- 4.7 -->
+<h3>4.7 人物卡</h3>
+<div class="step">
+  <ul>
+    <li>上传 1~4 张人物照片 → 生成标准三视图人物卡（参考《提示词提取记录》4.1 人物卡模板，16:9）</li>
+    <li>命名、设为默认、删除</li>
+    <li>图片本体存 IndexedDB（blob），元数据存 storage.local</li>
+    <li>上限：建议 20 张（防存储膨胀，可在设置调整）</li>
+  </ul>
+</div>
+
+<!-- 4.8 -->
+<h3>4.8 极简相册</h3>
+<div class="step">
+  <ul>
+    <li>两类条目：<strong>收集</strong>（kind=collect，带来源页面 URL）、<strong>生成记录</strong>（kind=generate，带 prompt / 模型）</li>
+    <li>操作：网格浏览、删除、选中作为生成输入、下载原图</li>
+    <li>分页：每次加载 50 条，滚动加载</li>
+    <li>图片本体存 IndexedDB，元数据索引存 storage.local</li>
+  </ul>
+</div>
+
+<!-- 4.9 -->
+<h3>4.9 结果区（全局底部）</h3>
+<div class="step">
+  <ul>
+    <li>显示最近一次生成结果（最多 4 张）</li>
+    <li>操作：再生成（同参数重新生成）/ 下载 / 存相册 / 复制 prompt / 送去拍一套</li>
+    <li>生成中显示进度与取消按钮（AbortController）</li>
+  </ul>
+</div>
+
+<!-- 4.10 -->
+<h3>4.10 设置页（options）</h3>
+<div class="step">
+  <h4>反推配置（reverseApi）</h4>
+  <ul><li>Base URL（默认 OpenAI 官方 <code>https://api.openai.com/v1</code>，可改中转）、API Key、模型名（如 <code>gpt-4o-mini</code>）</li></ul>
+  <h4>生图配置（generateApi）</h4>
+  <ul><li>Base URL、API Key、模型选择（<code>gpt-image</code> / <code>gpt-image 系列</code>，或自定义模型名）</li></ul>
+  <h4>通用</h4>
+  <ul>
+    <li>「测试连接」按钮：对反推/生图分别发最小请求验证 Key</li>
+    <li>反推方案选择（默认「通用快速反推」）</li>
+    <li>默认人物卡、默认画幅</li>
+    <li>免责声明 + 隐私说明（换脸风险、图片上传第三方 API）</li>
+  </ul>
+</div>
+
+<!-- 4.11 -->
+<h3>4.11 首次引导</h3>
+<div class="step">
+  <ul>
+    <li>安装后打开工作台：若任一 Key 未配 → 顶部黄条「请先完成 API 配置」+ 跳转设置按钮</li>
+    <li>设置页首访：展示 2 步引导（填反推 → 填生图 → 测试连接）</li>
+    <li>所有空态（相册空/人物卡空）提供「去配置/去上传」指引</li>
+  </ul>
+</div>
+
+<!-- 4.12 -->
+<h3>4.12 任务与错误处理（横切）</h3>
+<div class="step">
+  <h4>任务模型</h4>
+  <ul>
+    <li>每个生成动作 = 一个 Task：<code>{id, type, status, inputs, result, error, createdAt}</code></li>
+    <li>状态机：<code>pending → running → done | failed</code>（支持 cancel → cancelled）</li>
+    <li>Task 持久化到 storage.local —— <strong>防止 MV3 Service Worker 休眠导致状态丢失</strong></li>
+  </ul>
+  <h4>错误码与用户提示</h4>
+  <table>
+    <tr><th>场景</th><th>用户提示</th></tr>
+    <tr><td>Key 无效 / 401</td><td>「API Key 无效，请到设置检查」</td></tr>
+    <tr><td>余额不足 / 429</td><td>「额度不足或请求过快，请稍后重试」</td></tr>
+    <tr><td>图片超尺寸</td><td>「图片过大，已自动压缩」/ 失败则提示上传更小图片</td></tr>
+    <tr><td>防盗链抓取失败</td><td>「该图片无法直接读取，请截图或下载后上传」</td></tr>
+    <tr><td>异步任务超时</td><td>「生成超时，可在任务列表重试」</td></tr>
+    <tr><td>网络错误</td><td>「网络异常，请检查网络后重试」</td></tr>
+  </table>
+</div>
+
+<!-- ================= 05 ================= -->
+<h2 id="s5"><span class="no">05</span>非功能需求</h2>
+<table>
+  <tr><th>类别</th><th>要求</th></tr>
+  <tr><td>性能</td><td>工作台首屏 &lt; 1s；图片预处理（压缩/降采样）&lt; 500ms；悬浮层无卡顿</td></tr>
+  <tr><td>并发</td><td>同一时间仅 1 个生成任务（串行队列），可排队</td></tr>
+  <tr><td>安全</td><td>API Key 仅存 storage.local、仅在 background 使用，绝不进入 content/页面；输入 HTML 全部转义防 XSS</td></tr>
+  <tr><td>隐私</td><td>设置页明示「图片将上传你配置的 API 服务商」；不采集任何使用数据</td></tr>
+  <tr><td>兼容</td><td>Chrome ≥ 114（side panel API）；主流网站悬浮层可用</td></tr>
+  <tr><td>可维护</td><td>TS 严格模式；消息协议有类型定义；核心逻辑有单元测试</td></tr>
+</table>
+
+<!-- ================= 06 ================= -->
+<h2 id="s6"><span class="no">06</span>技术架构</h2>
+
+<h3>6.1 总体分层</h3>
+<div class="pre">
+┌─────────────────────────────────────────────────────────┐
+│ ① 用户触点层  content(悬浮层) · popup · panel(工作台) · options │
+├─────────────────────────────────────────────────────────┤
+│ ② 消息总线    chrome.runtime.sendMessage / connect       │
+├─────────────────────────────────────────────────────────┤
+│ ③ 核心引擎    background Service Worker                  │
+│     router.ts(路由) · settings.ts · tasks.ts(队列+持久化) │
+│     providers/(analyze · generate · test-connection)     │
+│     store/(album · person-card · db)                     │
+├─────────────────────────────────────────────────────────┤
+│ ④ 外部依赖    自定义 API（反推/生图） · chrome.storage · IndexedDB │
+└─────────────────────────────────────────────────────────┘
+</div>
+
+<h3>6.2 目录结构（详细）</h3>
+<div class="pre">shiyin/
+├── manifest.config.ts            # Vite 插件生成 manifest.json
+├── vite.config.ts                # 构建配置（多入口 + 产物目录）
+├── tsconfig.json                 # 严格模式
+├── package.json
+├── src/
+│   ├── shared/                   # ★ 所有端共享（无 chrome API 依赖）
+│   │   ├── types.ts              # Settings / PersonCard / AlbumItem / Task / Message
+│   │   ├── messages.ts           # 消息类型常量 + 请求/响应类型
+│   │   ├── constants.ts          # 默认值、限制、提示词文件引用
+│   │   ├── utils/image.ts        # 图片压缩/降采样/dataURL↔blob/切图(canvas)
+│   │   ├── utils/text.ts         # 文本清洗、转义、文件名 sanitize
+│   │   └── prompts.ts            # ★ 系统提示词模板（反推方案 + 人物卡/换脸/拍一套）
+│   ├── background/               # Service Worker
+│   │   ├── index.ts              # onMessage / onConnect 入口 + keep-alive
+│   │   ├── router.ts             # dispatchMessage（消息 → handler 映射）
+│   │   ├── settings.ts           # 设置读写 + 校验
+│   │   ├── tasks.ts              # 任务队列（串行）+ 持久化 + 恢复
+│   │   ├── store/
+│   │   │   ├── storage.ts        # chrome.storage.local 封装
+│   │   │   ├── db.ts             # IndexedDB 封装（图片 blob 表）
+│   │   │   ├── album.ts          # 相册 CRUD
+│   │   │   └── personCards.ts    # 人物卡 CRUD
+│   │   └── providers/
+│   │       ├── types.ts          # OpenAI 兼容协议类型
+│   │       ├── analyze.ts        # 反推（chat/completions）
+│   │       ├── generate.ts       # 生图（images/edits · generations）
+│   │       └── test.ts           # 测试连接
+│   ├── content/                  # 悬浮层
+│   │   ├── index.ts              # 初始化 + 站点探测
+│   │   ├── hover.ts              # hover 检测 + 300ms 防抖
+│   │   └── overlay.ts            # 按钮浮层（shadow DOM 隔离）
+│   ├── panel/                    # 侧边栏工作台
+│   │   ├── index.ts              # 入口 + 状态管理
+│   │   ├── state.ts              # 轻量全局状态（Tab/选择/结果）
+│   │   ├── components/           # 通用组件（选择器/任务条/结果卡）
+│   │   └── views/
+│   │       ├── analyze.ts        # 反推重绘 Tab
+│   │       ├── faceswap.ts       # 换脸 Tab
+│   │       ├── suite.ts          # 拍一套 Tab
+│   │       ├── album.ts          # 相册 Tab
+│   │       └── personCard.ts     # 人物卡 Tab
+│   ├── popup/                    # 弹窗
+│   │   ├── index.ts
+│   │   └── views/quickActions.ts
+│   └── options/                  # 设置页
+│       ├── index.ts
+│       └── views/settingsForm.ts # 反推/生图双配置 + 测试连接 + 引导
+├── icons/                        # 16/32/48/128（拾影品牌）
+└── tests/                        # Vitest 单元测试
+    ├── prompts.test.ts
+    ├── messages.test.ts
+    ├── image-utils.test.ts
+    └── tasks.test.ts
+</div>
+
+<h3>6.3 消息协议（完整）</h3>
+<p>统一响应 <code>{ ok: true, data } | { ok: false, error }</code>；错误信息为中文用户文案。消息类型用 TS 字面量联合类型保证编译期检查。</p>
+<table>
+  <tr><th>类型</th><th>方向</th><th>Payload 要点</th><th>Handler</th></tr>
+  <tr><td>settings-get / save / test</td><td>任意→bg</td><td>测试连接：{which:"reverse"|"generate"}</td><td>settings.ts / providers/test.ts</td></tr>
+  <tr><td>image-collect</td><td>content→bg</td><td>{imageUrl, pageUrl, alt} → 去重 → 存 IndexedDB</td><td>store/album.ts</td></tr>
+  <tr><td>album-list / album-delete / album-get</td><td>panel→bg</td><td>{cursor, limit} / {id}</td><td>store/album.ts</td></tr>
+  <tr><td>person-card-create / list / delete / set-default</td><td>panel→bg</td><td>create: {images[]}</td><td>store/personCards.ts</td></tr>
+  <tr><td>analyze-image</td><td>panel→bg</td><td>{imageDataUrl, profileId, signal}</td><td>providers/analyze.ts</td></tr>
+  <tr><td>generate-image</td><td>panel→bg</td><td>{prompt, taskType:"faceswap"|"redraw"|"suite"|"personCard", sourceRef, faceRef, aspectRatio}</td><td>providers/generate.ts + tasks.ts</td></tr>
+  <tr><td>task-status / task-cancel</td><td>panel→bg</td><td>{taskId} → AbortController</td><td>tasks.ts</td></tr>
+  <tr><td>download-file</td><td>panel→bg</td><td>{url, filename} → chrome.downloads</td><td>background/index.ts</td></tr>
+  <tr><td>open-panel / open-options</td><td>content→bg</td><td>唤起 side panel / options</td><td>background/index.ts</td></tr>
+</table>
+
+<h3>6.4 数据模型</h3>
+<div class="pre">// shared/types.ts（核心类型示意）
+interface Settings {
+  reverseApi:  { baseUrl: string; apiKey: string; model: string; profileId: string };
+  generateApi: { baseUrl: string; apiKey: string; model: string }; // gpt-image | gpt-image 系列
+  defaultPersonCardId: string;
+  onboarded: boolean;
+}
+interface PersonCard {
+  id: string; name: string;
+  blobKey: string;          // IndexedDB 引用
+  sourceCount: number;      // 建卡用了几张源图
+  isDefault: boolean;
+  createdAt: number;
+}
+interface AlbumItem {
+  id: string;
+  kind: "collect" | "generate";
+  blobKey: string;
+  sourceUrl?: string;       // collect 时记录来源页面
+  prompt?: string;          // generate 时记录
+  model?: string;
+  taskType?: string;
+  createdAt: number;
+}
+interface Task {
+  id: string;
+  type: "analyze" | "faceswap" | "redraw" | "suite" | "personCard";
+  status: "pending" | "running" | "done" | "failed" | "cancelled";
+  inputs: Record&lt;string, unknown&gt;;  // 参数快照（含 blobKey 引用）
+  result?: { blobKeys: string[]; prompt?: string };
+  error?: string;
+  createdAt: number;
+}
+type Message =
+  | { type: "analyze-image"; payload: AnalyzePayload }
+  | { type: "generate-image"; payload: GeneratePayload }
+  | { type: "image-collect"; payload: CollectPayload }
+  | /* ...其余类型 */;
+</div>
+
+<h3>6.5 存储设计</h3>
+<table>
+  <tr><th>数据</th><th>存放</th><th>原因</th></tr>
+  <tr><td>Settings / 任务 / 相册元数据 / 人物卡元数据</td><td>chrome.storage.local</td><td>轻量、可同步读写、SW 可访问</td></tr>
+  <tr><td>图片二进制（收集图/人物卡图/生成结果）</td><td>IndexedDB（<code>shiyin-db</code>，store: <code>images</code>）</td><td>storage 有配额限制，大图必须走 IndexedDB</td></tr>
+  <tr><td>任务进行中快照</td><td>storage.local（<code>tasks</code>）</td><td>SW 休眠后恢复依据</td></tr>
+</table>
+
+<h3>6.6 状态管理</h3>
+<ul>
+  <li>工作台：轻量「单例 store + 订阅」模式（无 Redux 类依赖），Tab 切换/选择/结果均为可订阅状态</li>
+  <li>跨端状态（任务进度）：background 持有唯一任务队列，变更后向所有连接的端口广播 <code>task-changed</code></li>
+  <li>content 与 panel 用 <code>chrome.runtime.connect</code> 长连接（name: <code>shiyin-workbench</code>）接收广播</li>
+</ul>
+
+<!-- ================= 07 ================= -->
+<h2 id="s7"><span class="no">07</span>技术栈详述</h2>
+
+<div class="box blue"><strong>一句话总览</strong>：TypeScript（类型安全） + Vite（构建/热更新） + 原生 Web API（无重型框架） + Vitest（测试）。全项目无后端，仅调用用户配置的自定义 AI API。</div>
+
+<h3>7.1 语言：TypeScript（严格模式）</h3>
+<table>
+  <tr><th>用途</th><th>具体</th></tr>
+  <tr><td>消息协议</td><td>用 union type 定义全部消息，router 的 switch 分支自动补全、传参错编译期报错</td></tr>
+  <tr><td>数据模型</td><td>Settings / PersonCard / AlbumItem / Task 全类型化，跨端共享（shared/types.ts）</td></tr>
+  <tr><td>API 响应</td><td>反推/生图响应定义类型，避免运行时字段拼写错误</td></tr>
+  <tr><td>tsconfig</td><td><code>strict: true</code>，<code>noUncheckedIndexedAccess</code> 等全开</td></tr>
+</table>
+
+<h3>7.2 构建：Vite + 自定义 manifest 插件</h3>
+<table>
+  <tr><th>项</th><th>说明</th></tr>
+  <tr><td>多入口</td><td>background / content / panel / popup / options 五个入口，各自打包</td></tr>
+  <tr><td>manifest 生成</td><td><code>manifest.config.ts</code> 写 Vite 插件，构建时按环境注入 version/名称/图标，输出 <code>dist/manifest.json</code></td></tr>
+  <tr><td>content 隔离</td><td>content script 打包为 IIFE（不设 type=module），避免与页面冲突；样式注入用隔离 class 前缀</td></tr>
+  <tr><td>热更新</td><td>开发模式 <code>vite dev</code> + <code>chrome.runtime.reload()</code> 辅助脚本，改码即刷新</td></tr>
+  <tr><td>产物</td><td><code>dist/</code> 直接「加载已解压的扩展程序」</td></tr>
+</table>
+
+<h3>7.3 UI 方案：原生 TS + 组件函数（不引 React/Vue）</h3>
+<table>
+  <tr><th>决策</th><th>理由</th></tr>
+  <tr><td>不引框架</td><td>扩展 UI 页面规模小（5 个 Tab + 表单），框架会引入构建复杂度与体积；原生 TS + 模板字符串 + 事件委托足够</td></tr>
+  <tr><td>组件化写法</td><td>每个视图导出 <code>render(container, state) =&gt; cleanup()</code> 函数；状态变化时局部重渲染，配合事件委托减少监听器</td></tr>
+  <tr><td>样式</td><td>手写 CSS（CSS 变量统一主题色）；content 悬浮层用 shadow DOM 隔离页面样式</td></tr>
+  <tr><td>升级路径</td><td>若后续 Tab 状态复杂度上升，可平滑引入 Preact（~4KB）——架构上组件函数即兼容</td></tr>
+</table>
+
+<h3>7.4 存储：chrome.storage.local + IndexedDB</h3>
+<ul>
+  <li><code>shared/utils</code> 提供 Promise 化封装；IndexedDB 用原生 API + 薄封装（避免额外依赖）</li>
+  <li>图片一律先压缩（canvas 降采样到 ≤ 2048px、JPEG/WebP 质量 0.9）再入库，控制存储与上传体积</li>
+</ul>
+
+<h3>7.5 网络：background 内 fetch（仅在 background 发起）</h3>
+<ul>
+  <li>所有 API 调用集中在 <code>providers/</code>，content/panel 一律通过消息间接调用 —— 保证 API Key 不泄露到页面</li>
+  <li>请求统一带 <code>AbortSignal</code>（支持取消）与超时（15s 反推 / 120s 生图首响应）</li>
+  <li>异步生图：若服务商走异步任务（提交 → 轮询），封装 <code>pollTask(url, interval, timeout)</code></li>
+</ul>
+
+<h3>7.6 测试：Vitest</h3>
+<ul>
+  <li>纯逻辑全测：prompts 组装、消息类型、图片工具（切图/压缩）、任务状态机</li>
+  <li>API 层用 fetch mock（<code>vi.stubGlobal</code>）测请求体正确性</li>
+  <li>目标：核心逻辑覆盖率 ≥ 70%</li>
+</ul>
+
+<h3>7.7 工程质量配套</h3>
+<ul>
+  <li><strong>ESLint + Prettier</strong>：统一规范（typescript-eslint recommended）</li>
+  <li><strong>husky + lint-staged</strong>：提交前自动 lint</li>
+  <li><strong>Git</strong>：main + feature 分支，每个里程碑一个 tag</li>
+</ul>
+
+<h3>7.8 依赖清单（目标：极简）</h3>
+<table>
+  <tr><th>依赖</th><th>类型</th><th>用途</th></tr>
+  <tr><td>typescript</td><td>dev</td><td>类型</td></tr>
+  <tr><td>vite</td><td>dev</td><td>构建</td></tr>
+  <tr><td>vitest</td><td>dev</td><td>测试</td></tr>
+  <tr><td>eslint / prettier</td><td>dev</td><td>规范</td></tr>
+  <tr><td>（运行时）</td><td>—</td><td>零第三方运行时依赖，全部原生 API</td></tr>
+</table>
+
+<!-- ================= 08 ================= -->
+<h2 id="s8"><span class="no">08</span>API 对接规格</h2>
+
+<h3>8.1 反推（视觉理解）—— OpenAI 兼容 chat/completions</h3>
+<div class="pre">POST {reverseApi.baseUrl}/chat/completions
+{
+  "model": "gpt-4o-mini",            // 用户配置
+  "messages": [{
+    "role": "user",
+    "content": [
+      { "type": "text", "text": "【系统提示词】" },   // 来自反推方案合集（用户选择 profileId）
+      { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,..." } }
+    ]
+  }],
+  "temperature": 0.7,
+  "max_tokens": 1200
+}</div>
+<p>响应取 <code>choices[0].message.content</code>。系统提示词来源：<code>src/shared/prompts.ts</code> 内嵌反推方案（默认「通用快速反推」，可选「人像通用详细」等，方案原文见《自研反推方案提示词合集.md》）。</p>
+
+<h3>8.2 生图（gpt-image / gpt-image 系列）—— OpenAI 兼容 images</h3>
+<p>两种能力：<strong>编辑</strong>（带参考图）与<strong>生成</strong>（纯文生图）。拾影全部带参考图，主走 edits。</p>
+<div class="pre">POST {generateApi.baseUrl}/images/edits     // multipart/form-data
+  image:   构图参考图（源图，二进制）
+  prompt:  提示词（含人脸/场景指令）
+  model:   gpt-image | gpt-image 系列          // 用户配置
+  size:    "1024x1024" | "1024x1792" | ...   // 按画幅映射
+
+// 若服务商支持多图输入（部分中转支持），附加：
+  image2:  人脸参考图（人物卡）
+
+// 不支持多图的场景 → 拼图法（fallback）：
+//   在发送前把人物卡人脸缩放贴到源图右下角（50px 角标），
+//   prompt 注明「右下角小图为人脸参考，请将其身份用于主图」</div>
+<p><strong>提示词来源</strong>（见《自研提示词模板记录.md》第四节）：
+  <span class="pill coral">换脸</span>4.2 换脸模板原文（图2=源图作底图不变，图1=人物卡换脸）—— prompt = 反推配方 + 4.2 全文
+  <br>
+  <span class="pill blue">重绘</span>反推配方（用户可编辑）+ 重绘使用说明（借鉴4.2双图分工思路，但指令是「全新生成」而非「保留源图」——详见 4.4 节）
+  <br>
+  <span class="pill teal">拍一套</span>4.3 英文模板（一致性最高优先级）
+  <br>
+  <span class="pill purple">人物卡</span>4.1 三视图模板</p>
+
+<h3>8.3 画幅映射</h3>
+<table>
+  <tr><th>UI 选项</th><th>OpenAI size</th></tr>
+  <tr><td>1:1</td><td>1024×1024</td></tr>
+  <tr><td>3:4</td><td>768×1024</td></tr>
+  <tr><td>4:3</td><td>1024×768</td></tr>
+  <tr><td>9:16</td><td>768×1344</td></tr>
+  <tr><td>16:9（人物卡）</td><td>1344×768</td></tr>
+</table>
+
+<h3>8.4 测试连接</h3>
+<ul>
+  <li>反推：发一条 <code>max_tokens: 8</code> 的最小 chat 请求（纯文本）</li>
+  <li>生图：发一条 <code>images/generations</code> 最小请求（或仅检查 401/403）</li>
+  <li>结果分级：<code>ok / 401 无效Key / 403 无权限 / 404 模型或端点不支持 / 其他</code>，各自给中文提示</li>
+</ul>
+
+<!-- ================= 09 ================= -->
+<h2 id="s9"><span class="no">09</span>核心数据流</h2>
+
+<h3>9.1 反推 + 双参考重绘（时序）</h3>
+<div class="flow">panel 选图 → analyze-image 消息 → bg.providers/analyze.ts 调 chat/completions → 返回提示词 → panel 编辑框（用户可改）→ panel 选人物卡 → generate-image 消息(taskType=redraw) → tasks.ts 建任务(持久化) → providers/generate.ts 预处理(压缩+拼图) → 调 images/edits → 轮询/等待 → 结果写 IndexedDB → 广播 task-changed → panel 结果区渲染 → 用户下载/存相册</div>
+
+<h3>9.2 换脸（时序简版）</h3>
+<div class="flow">选源图 + 选卡 → generate-image(taskType=faceswap) → 同 9.1 生图链路（人脸=人物卡，构图=源图）→ 结果区</div>
+
+<h3>9.3 拍一套（含切图）</h3>
+<div class="flow">选图 + (选卡) → generate-image(taskType=suite) → 生成 2×2 大图 → 前端 canvas 按中心十字切 4 块 → 4 张单图 + 原大图入结果区/相册 → 可逐张下载</div>
+
+<h3>9.4 任务持久化与恢复（防 SW 休眠）</h3>
+<div class="flow">任务创建即写 storage.local(tasks) → 执行中每步更新 status → SW 被休眠唤醒(onStartup) → 扫描 running 任务 → 若服务商支持查询则续查，否则标记 failed+可重试 → 广播恢复结果</div>
+
+<!-- ================= 10 ================= -->
+<h2 id="s10"><span class="no">10</span>开发里程碑（详细任务分解）</h2>
+
+<div class="step">
+  <h4>M1 · 脚手架与工程底座</h4>
+  <p><strong>目标</strong>：可加载的空扩展 + 类型/构建/lint 全通。</p>
+  <ul>
+    <li>Vite + TS 项目初始化，tsconfig strict，ESLint/Prettier/husky</li>
+    <li>manifest.config.ts 生成 manifest（权限：storage/tabs/activeTab/sidePanel/downloads/scripting/alarms；host: &lt;all_urls&gt;）</li>
+    <li>五个空入口（background/panel/popup/options/content）各自能加载打开</li>
+    <li>icons 占位 + 名称「拾影」</li>
+  </ul>
+  <p><strong>验收</strong>：<code>dist/</code> 加载成功，各页面打开无报错；<code>npm run build &amp;&amp; npm run lint &amp;&amp; npm test</code> 通过。</p>
+</div>
+
+<div class="step">
+  <h4>M2 · 设置页 + 存储 + 测试连接</h4>
+  <p><strong>目标</strong>：Key 配置闭环。</p>
+  <ul>
+    <li>Settings 类型 + storage 封装 + 默认值</li>
+    <li>设置表单（反推/生图双配置 + 模型选择 + 画幅 + 默认卡）</li>
+    <li>测试连接（8.4 节）与分级错误提示</li>
+    <li>首次引导黄条逻辑（未配 Key）</li>
+  </ul>
+  <p><strong>验收</strong>：填真实 Key 测通；填错误 Key 出「无效」提示；刷新后设置保留。</p>
+</div>
+
+<div class="step">
+  <h4>M3 · 悬浮层 + 收集 + 相册</h4>
+  <p><strong>目标</strong>：网页触发与素材沉淀。</p>
+  <ul>
+    <li>content hover 检测（300ms 防抖）+ overlay 双按钮（shadow DOM）</li>
+    <li>「打开拾影」→ popup 带入图片</li>
+    <li>image-collect 去重入库（IndexedDB）+ toast</li>
+    <li>相册视图（网格/分页/删除/选中）</li>
+  </ul>
+  <p><strong>验收</strong>：主流网站悬停可用；收集入库；相册浏览删除。</p>
+</div>
+
+<div class="step">
+  <h4>M4 · 人物卡</h4>
+  <p><strong>目标</strong>：人脸参考资产。</p>
+  <ul>
+    <li>上传 1~4 图 → 压缩 → 存 IndexedDB</li>
+    <li>建卡（调生图 API 生成三视图卡，参考 4.1 模板）→ 命名/默认/删除</li>
+    <li>人物卡视图 + 选择器接入生成流程</li>
+  </ul>
+  <p><strong>验收</strong>：建卡成功且人物相似度高；默认卡生效。</p>
+</div>
+
+<div class="step">
+  <h4>M5 · 反推流程</h4>
+  <p><strong>目标</strong>：图 → 可编辑提示词。</p>
+  <ul>
+    <li>providers/analyze.ts（chat/completions + 系统提示词内嵌反推方案）</li>
+    <li>反推 Tab：选图 → 反推 → 编辑框（可编辑）→ 复制</li>
+    <li>反推错误处理（超时/Key/图片不可读）</li>
+  </ul>
+  <p><strong>验收</strong>：真实图片反推成功，提示词质量可用；编辑后复制。</p>
+</div>
+
+<div class="step">
+  <h4>M6 · 生图 + 结果区 + 下载</h4>
+  <p><strong>目标</strong>：出图闭环。</p>
+  <ul>
+    <li>providers/generate.ts（edits multipart + 拼图 fallback + 异步轮询）</li>
+    <li>任务队列（串行 + 持久化 + 取消）</li>
+    <li>结果区（再生成/下载/存相册/复制 prompt）</li>
+    <li>画幅映射 + 图片预处理</li>
+  </ul>
+  <p><strong>验收</strong>：gpt-image 与 gpt-image 系列 均能出图；下载成功；再生成可换结果。</p>
+</div>
+
+<div class="step">
+  <h4>M7 · 换脸 + 拍一套</h4>
+  <p><strong>目标</strong>：两大生成功能完整。</p>
+  <ul>
+    <li>换脸 Tab（源图 + 人物卡，4.2 模板）</li>
+    <li>拍一套 Tab（4.3 模板 + canvas 切 4 格 + 逐格下载）</li>
+    <li>反推重绘 Tab 串通（9.1 全流程）</li>
+  </ul>
+  <p><strong>验收</strong>：换脸自然无贴脸感；四宫格可切可下载。</p>
+</div>
+
+<div class="step">
+  <h4>M8 · 收尾与加固</h4>
+  <p><strong>目标</strong>：生产可用。</p>
+  <ul>
+    <li>全错误场景兜底（4.12 表）</li>
+    <li>SW 休眠恢复全链路自测</li>
+    <li>图标正式版（拾影品牌）+ 免责声明 + 隐私说明</li>
+    <li>单元测试补全 + 手工验收清单执行</li>
+  </ul>
+  <p><strong>验收</strong>：13 节 MVP 验收全部通过。</p>
+</div>
+
+<!-- ================= 11 ================= -->
+<h2 id="s11"><span class="no">11</span>测试计划</h2>
+<table>
+  <tr><th>层级</th><th>覆盖</th><th>工具</th></tr>
+  <tr><td>单元测试</td><td>prompts 组装、消息协议类型、图片工具（切图/压缩/拼图）、任务状态机、画幅映射</td><td>Vitest</td></tr>
+  <tr><td>API 层测试</td><td>反推/生图请求体构造（fetch mock 校验 URL/method/body）</td><td>Vitest + vi.stubGlobal</td></tr>
+  <tr><td>手工验收</td><td>按 13 节清单逐项在 Chrome 实测</td><td>手工</td></tr>
+</table>
+
+<!-- ================= 12 ================= -->
+<h2 id="s12"><span class="no">12</span>风险与合规</h2>
+<div class="box coral">
+  <ul>
+    <li><strong>中转站兼容性</strong>：images/edits 的 multipart 多图支持不一 → M6 真实验证；拼图法作为兜底</li>
+    <li><strong>换脸效果</strong>：依赖模型理解 → 提示词按 4.2 模板，必要时调措辞</li>
+    <li><strong>API Key 安全</strong>：仅 background 持有；提示用户勿分享扩展备份</li>
+    <li><strong>合规</strong>：学习用途；换脸功能含免责声明；不上传他人私密照片</li>
+    <li><strong>提示词版权</strong>：素材来自学习提取，仅本项目内部使用，不公开分发</li>
+    <li><strong>权限最小化</strong>：&lt;all_urls&gt; 是悬浮层必需；商店审核时准备说明文案</li>
+  </ul>
+</div>
+
+<!-- ================= 13 ================= -->
+<h2 id="s13"><span class="no">13</span>MVP 验收标准</h2>
+<div class="box teal">
+  <ol>
+    <li>扩展可在 Chrome 加载，工具栏图标 + 侧边栏 + 弹窗 + 设置页全部可打开</li>
+    <li>未配 Key 有引导；配置后测试连接反馈正确</li>
+    <li>网页悬停 <img> 出双按钮，收集去重生效，相册可浏览/删除</li>
+    <li>人物卡可建/选/删/设默认</li>
+    <li>反推成功且提示词可编辑；换脸/重绘/拍一套三种任务均能出图并下载</li>
+    <li>任务中途 SW 休眠后恢复不丢状态；所有错误场景有中文提示与重试</li>
+    <li>控制台无未捕获异常；核心逻辑单元测试通过</li>
+  </ol>
+</div>
+
+<div class="foot">
+  拾影 ShiYing · PRD v1.0 · 2026-08-08 · 本 PRD 评审通过后进入 M1 开发
+</div>
+
+</div>
+</body>
+</html>
