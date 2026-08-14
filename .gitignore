@@ -13,10 +13,10 @@ dist/
 *.local
 sk-*.txt
 
-# 个人 / 竞品素材（不上传）
+# 内部素材（不上传）
 docs/面试素材-问题解决复盘.md
-docs/自研反推方案提示词合集.md
-docs/自研提示词模板记录.md
+docs/*提示词合集*.md
+docs/*提取记录*.md
 
 # 系统文件
 .DS_Store

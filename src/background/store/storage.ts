@@ -1,7 +1,7 @@
 /**
  * chrome.storage.local 的 Promise 封装
  *
- * ★ 借鉴 同类产品：storage.local 只存小元数据（设置/引用），图片 blob 一律进 IndexedDB。
+ * ★ 存储分层设计：storage.local 只存小元数据（设置/引用），图片 blob 一律进 IndexedDB。
  * ★ 写库前 sanitize：剔除任何可能混入的敏感字段（apiKey/token/secret）与超大 dataURL。
  */
 

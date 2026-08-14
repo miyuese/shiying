@@ -2,13 +2,13 @@
  * IndexedDB 封装（图片 blob 表 + 错误日志表）
  * DB: shiyin-db / store: images, errors
  *
- * ★ 参照 同类产品插件的成熟设计：
+ * ★ 参考同类成熟插件的设计经验：
  *   - 开库即用、用完即关：每次操作打开全新连接，操作完立即 db.close()
  *   - 不缓存常驻连接，避免 MV3 Service Worker 空闲被杀/重启后，旧连接
  *     指向的数据与实际落库不一致，导致"写进去了却读不到"
  *   - 事务同时监听 oncomplete（提交成功）/ onerror（失败）/ onabort（被中止）
  *   - 配合 manifest 的 unlimitedStorage 权限，防止浏览器在存储压力下
- *     清理掉本插件的 IndexedDB（同类产品 能跨重启存图正是靠这一点）
+ *     清理掉本插件的 IndexedDB（开库即用能跨重启存图正是靠这一点）
  */
 
 import { DB_NAME, DB_VERSION, DB_STORE_IMAGES, DB_STORE_ERRORS } from '../../shared/constants';

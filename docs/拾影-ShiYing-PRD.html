@@ -89,7 +89,7 @@
 <h2 id="s2"><span class="no">02</span>项目概述</h2>
 
 <h3>2.1 背景与定位</h3>
-<p>受同类工具启发，从零原创重写一款面向内容创作者的网页图片 AI 工具。核心价值一句话：<strong>「在任意网页上，把一张好图变成属于你的新图」</strong>——识别图中灵感（反推提示词）、换脸、按参考重绘、拍一套，并把过程沉淀为本地素材。</p>
+<p>面向内容创作者的网页图片 AI 工具，从零自研（Chrome 扩展，无后端依赖）。核心价值一句话：<strong>「在任意网页上，把一张好图变成属于你的新图」</strong>——识别图中灵感（反推提示词）、换脸、按参考重绘、拍一套，并把过程沉淀为本地素材。</p>
 
 <h3>2.2 目标用户</h3>
 <ul>
@@ -111,8 +111,8 @@
 </div>
 <div class="box coral"><strong>本版本不做：</strong>
   <ul style="margin-top:6px;margin-bottom:0;">
-    <li>账号体系 / 积分计费 / License 授权（原版商业功能）</li>
-    <li>多 Provider 目录化适配（仅 gpt-image、gpt-image 系列 + 任意反推模型）</li>
+    <li>账号体系 / 积分计费 / License 授权</li>
+    <li>多 Provider 目录化适配（仅 gpt-image 系列 + 任意反推模型）</li>
     <li>背景图识别（仅 &lt;img&gt;）、人脸圈选、语义搜索、多语言、云端同步</li>
     <li>水印功能（用户明确不要，保生成质量）</li>
   </ul>
@@ -224,15 +224,15 @@
     <table style="margin:0;font-size:13px;">
       <tr><th style="width:90px;"></th><th>换脸（功能 A）</th><th>重绘（功能 B）</th></tr>
       <tr><td>目标</td><td>在<strong>已有源图</strong>上换脸，其他全不变</td><td>生成一张<strong>全新图</strong>，参考构图+人脸</td></tr>
-      <tr><td>指令模板</td><td>4.2 换脸模板原文<br>「以图2作为唯一基础图…严格保留图2的一切…只换脸」</td><td>反推配方 + 重绘使用说明（见下）<br>「根据提示词生成新图，构图参考图指导布局/场景/光线，人脸参考图指导人物身份」</td></tr>
+      <tr><td>指令模板</td><td>自研换脸模板<br>「以图2作为唯一基础图…严格保留图2的一切…只换脸」</td><td>反推配方 + 重绘使用说明（见下）<br>「根据提示词生成新图，构图参考图指导布局/场景/光线，人脸参考图指导人物身份」</td></tr>
       <tr><td>图2（构图参考）</td><td>源图 = <strong>保持不变的底图</strong></td><td>构图参考图 = <strong>生成参考，不是底图</strong></td></tr>
       <tr><td>图1（人脸参考）</td><td>人物卡 = 替换进去的脸</td><td>人物卡 = 生成人物的容貌来源</td></tr>
-      <tr><td>关键区别</td><td>4.2 模板说「严格保留图2的一切」</td><td>重绘不保留任何图，是全新生成</td></tr>
+      <tr><td>关键区别</td><td>换脸模板说「严格保留图2的一切」</td><td>重绘不保留任何图，是全新生成</td></tr>
     </table>
   </div>
   <p><strong>反推</strong>：使用反推方案合集（默认「通用快速反推」），由用户在设置中选择方案。</p>
-  <p><strong>换脸指令</strong>：使用《提示词提取记录》4.2 换脸模板原文——以源图为「图2」（唯一基础图，保持不变），人物卡为「图1」（脸部身份来源），prompt 字段 = 反推配方 + 4.2 模板。</p>
-  <p><strong>重绘指令</strong>：prompt 字段 = 反推配方（用户可编辑）+ 重绘使用说明。说明借鉴 4.2 的「双图分工」思路，但<strong>不是 4.2 原文</strong>——因为 4.2 说「以图2作为唯一基础图，严格保留图2的一切」，而重绘是全新生成。重绘使用说明定义为：</p>
+  <p><strong>换脸指令</strong>：使用自研换脸模板（双图分工）——以源图为「图2」（唯一基础图，保持不变），人物卡为「图1」（脸部身份来源），prompt 字段 = 反推配方 + 换脸模板。</p>
+  <p><strong>重绘指令</strong>：prompt 字段 = 反推配方（用户可编辑）+ 重绘使用说明。说明借鉴换脸模板的「双图分工」思路，但<strong>不是其原文</strong>——因为换脸模板说「以图2作为唯一基础图，严格保留图2的一切」，而重绘是全新生成。重绘使用说明定义为：</p>
   <div class="pre">根据以下提示词生成一张全新的图片。
 
 构图参考图（= 反推来源图）作为画面布局、场景、构图、镜头角度、光线环境和色彩氛围的参考——但不是底图，最终结果应是全新画面，而非在参考图上修改。
@@ -253,7 +253,7 @@
   <ul>
     <li>输入：源图（相册/收集/上传）+ 人物卡（人脸）</li>
     <li>流程：选图 → 选卡 → 点「换脸」→ 生成 → 结果区</li>
-    <li>提示词：参考《提示词提取记录》4.2 换脸模板（图2=源图、图1=人物卡）</li>
+    <li>提示词：自研换脸模板（图2=源图、图1=人物卡）</li>
     <li>失败处理：源图无清晰人脸 / 人物卡无效 → 明确报错提示</li>
   </ul>
 </div>
@@ -264,7 +264,7 @@
   <ul>
     <li>输入：参考图（通常是刚生成的结果/相册图）+ 人物卡（默认继承当前）</li>
     <li>流程：选图 → （选卡，可默认）→ 点「拍一套」→ 生成 2×2 大图 → <strong>本地切分为 4 张</strong> → 结果区展示 4 张 + 原大图</li>
-    <li>提示词：参考《提示词提取记录》4.3 拍一套英文模板（一致性最高优先级）</li>
+    <li>提示词：自研拍一套英文模板（一致性最高优先级）</li>
     <li>切图：<code>canvas</code> 按中心十字裁切 4 块，保留各格独立下载</li>
   </ul>
 </div>
@@ -273,7 +273,7 @@
 <h3>4.7 人物卡</h3>
 <div class="step">
   <ul>
-    <li>上传 1~4 张人物照片 → 生成标准三视图人物卡（参考《提示词提取记录》4.1 人物卡模板，16:9）</li>
+    <li>上传 1~4 张人物照片 → 生成标准三视图人物卡（自研模板，16:9）</li>
     <li>命名、设为默认、删除</li>
     <li>图片本体存 IndexedDB（blob），元数据存 storage.local</li>
     <li>上限：建议 20 张（防存储膨胀，可在设置调整）</li>
@@ -307,7 +307,7 @@
   <h4>反推配置（reverseApi）</h4>
   <ul><li>Base URL（默认 OpenAI 官方 <code>https://api.openai.com/v1</code>，可改中转）、API Key、模型名（如 <code>gpt-4o-mini</code>）</li></ul>
   <h4>生图配置（generateApi）</h4>
-  <ul><li>Base URL、API Key、模型选择（<code>gpt-image</code> / <code>gpt-image 系列</code>，或自定义模型名）</li></ul>
+  <ul><li>Base URL、API Key、模型选择（<code>gpt-image 系列</code>，或自定义模型名）</li></ul>
   <h4>通用</h4>
   <ul>
     <li>「测试连接」按钮：对反推/生图分别发最小请求验证 Key</li>
@@ -455,7 +455,7 @@
 <div class="pre">// shared/types.ts（核心类型示意）
 interface Settings {
   reverseApi:  { baseUrl: string; apiKey: string; model: string; profileId: string };
-  generateApi: { baseUrl: string; apiKey: string; model: string }; // gpt-image | gpt-image 系列
+  generateApi: { baseUrl: string; apiKey: string; model: string }; // gpt-image 系列
   defaultPersonCardId: string;
   onboarded: boolean;
 }
@@ -594,14 +594,14 @@ type Message =
   "temperature": 0.7,
   "max_tokens": 1200
 }</div>
-<p>响应取 <code>choices[0].message.content</code>。系统提示词来源：<code>src/shared/prompts.ts</code> 内嵌反推方案（默认「通用快速反推」，可选「人像通用详细」等，方案原文见《自研反推方案提示词合集.md》）。</p>
+<p>响应取 <code>choices[0].message.content</code>。系统提示词来源：<code>src/shared/prompts.ts</code> 内嵌反推方案（默认「通用快速反推」，可选「人像通用详细」等）。</p>
 
-<h3>8.2 生图（gpt-image / gpt-image 系列）—— OpenAI 兼容 images</h3>
+<h3>8.2 生图（gpt-image 系列）—— OpenAI 兼容 images</h3>
 <p>两种能力：<strong>编辑</strong>（带参考图）与<strong>生成</strong>（纯文生图）。拾影全部带参考图，主走 edits。</p>
 <div class="pre">POST {generateApi.baseUrl}/images/edits     // multipart/form-data
   image:   构图参考图（源图，二进制）
   prompt:  提示词（含人脸/场景指令）
-  model:   gpt-image | gpt-image 系列          // 用户配置
+  model:   gpt-image 系列                // 用户配置
   size:    "1024x1024" | "1024x1792" | ...   // 按画幅映射
 
 // 若服务商支持多图输入（部分中转支持），附加：
@@ -610,14 +610,14 @@ type Message =
 // 不支持多图的场景 → 拼图法（fallback）：
 //   在发送前把人物卡人脸缩放贴到源图右下角（50px 角标），
 //   prompt 注明「右下角小图为人脸参考，请将其身份用于主图」</div>
-<p><strong>提示词来源</strong>（见《自研提示词模板记录.md》第四节）：
-  <span class="pill coral">换脸</span>4.2 换脸模板原文（图2=源图作底图不变，图1=人物卡换脸）—— prompt = 反推配方 + 4.2 全文
+<p><strong>提示词来源</strong>（自研模板，定义见 <code>src/shared/prompts.ts</code>）：
+  <span class="pill coral">换脸</span>换脸模板（图2=源图作底图不变，图1=人物卡换脸）—— prompt = 反推配方 + 换脸模板全文
   <br>
-  <span class="pill blue">重绘</span>反推配方（用户可编辑）+ 重绘使用说明（借鉴4.2双图分工思路，但指令是「全新生成」而非「保留源图」——详见 4.4 节）
+  <span class="pill blue">重绘</span>反推配方（用户可编辑）+ 重绘使用说明（借鉴换脸模板双图分工思路，但指令是「全新生成」而非「保留源图」——详见 4.4 节）
   <br>
-  <span class="pill teal">拍一套</span>4.3 英文模板（一致性最高优先级）
+  <span class="pill teal">拍一套</span>拍一套英文模板（一致性最高优先级）
   <br>
-  <span class="pill purple">人物卡</span>4.1 三视图模板</p>
+  <span class="pill purple">人物卡</span>人物卡三视图模板</p>
 
 <h3>8.3 画幅映射</h3>
 <table>
@@ -695,7 +695,7 @@ type Message =
   <p><strong>目标</strong>：人脸参考资产。</p>
   <ul>
     <li>上传 1~4 图 → 压缩 → 存 IndexedDB</li>
-    <li>建卡（调生图 API 生成三视图卡，参考 4.1 模板）→ 命名/默认/删除</li>
+    <li>建卡（调生图 API 生成三视图卡，用人物卡模板）→ 命名/默认/删除</li>
     <li>人物卡视图 + 选择器接入生成流程</li>
   </ul>
   <p><strong>验收</strong>：建卡成功且人物相似度高；默认卡生效。</p>
@@ -721,15 +721,15 @@ type Message =
     <li>结果区（再生成/下载/存相册/复制 prompt）</li>
     <li>画幅映射 + 图片预处理</li>
   </ul>
-  <p><strong>验收</strong>：gpt-image 与 gpt-image 系列 均能出图；下载成功；再生成可换结果。</p>
+  <p><strong>验收</strong>：gpt-image 系列均能出图；下载成功；再生成可换结果。</p>
 </div>
 
 <div class="step">
   <h4>M7 · 换脸 + 拍一套</h4>
   <p><strong>目标</strong>：两大生成功能完整。</p>
   <ul>
-    <li>换脸 Tab（源图 + 人物卡，4.2 模板）</li>
-    <li>拍一套 Tab（4.3 模板 + canvas 切 4 格 + 逐格下载）</li>
+    <li>换脸 Tab（源图 + 人物卡，换脸模板）</li>
+    <li>拍一套 Tab（拍一套模板 + canvas 切 4 格 + 逐格下载）</li>
     <li>反推重绘 Tab 串通（9.1 全流程）</li>
   </ul>
   <p><strong>验收</strong>：换脸自然无贴脸感；四宫格可切可下载。</p>
@@ -761,10 +761,10 @@ type Message =
 <div class="box coral">
   <ul>
     <li><strong>中转站兼容性</strong>：images/edits 的 multipart 多图支持不一 → M6 真实验证；拼图法作为兜底</li>
-    <li><strong>换脸效果</strong>：依赖模型理解 → 提示词按 4.2 模板，必要时调措辞</li>
+    <li><strong>换脸效果</strong>：依赖模型理解 → 提示词按自研换脸模板，必要时调措辞</li>
     <li><strong>API Key 安全</strong>：仅 background 持有；提示用户勿分享扩展备份</li>
     <li><strong>合规</strong>：学习用途；换脸功能含免责声明；不上传他人私密照片</li>
-    <li><strong>提示词版权</strong>：素材来自学习提取，仅本项目内部使用，不公开分发</li>
+    <li><strong>提示词版权</strong>：提示词模板为自研成果，仅本项目内部使用</li>
     <li><strong>权限最小化</strong>：&lt;all_urls&gt; 是悬浮层必需；商店审核时准备说明文案</li>
   </ul>
 </div>

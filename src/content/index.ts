@@ -1,6 +1,6 @@
 /**
  * Content Script · 悬浮层
- * 借鉴 同类产品 的识别机制：
+ * 自研图片识别机制：
  * - pointermove + requestAnimationFrame 节流（比 mouseover 更稳，不丢事件）
  * - target.closest('img') 找不到时，用 document.elementsFromPoint() 穿透查找
  *   （很多网页图片被遮罩/覆盖层挡住，直接取 event.target 拿不到 img）
@@ -192,7 +192,7 @@ function positionOverlay(img: HTMLImageElement): void {
   host.style.height = `${rect.height}px`;
 }
 
-/* ---------------- 图片识别（同类产品 机制） ---------------- */
+/* ---------------- 图片识别 ---------------- */
 
 function findEligibleImage(startNode: Element | null): HTMLImageElement | null {
   if (!startNode) return null;
@@ -237,7 +237,7 @@ function resolveHoverImageFromPointer(): HTMLImageElement | null {
   return null;
 }
 
-/* ---------------- 事件处理（同类产品：pointermove + rAF 节流） ---------------- */
+/* ---------------- 事件处理（pointermove + rAF 节流） ---------------- */
 
 function handlePointerMove(event: PointerEvent): void {
   hoverPointerEvent = {
@@ -371,7 +371,7 @@ function showToast(text: string): void {
 /* ---------------- 初始化 ---------------- */
 
 function init(): void {
-  // 同类产品 方式：pointermove + capture，rAF 节流
+  // pointermove + capture，rAF 节流
   document.addEventListener('pointermove', handlePointerMove, true);
   document.addEventListener('scroll', handleDocumentScroll, true);
   window.addEventListener('resize', handleWindowResize);
