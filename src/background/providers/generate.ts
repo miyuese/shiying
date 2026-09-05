@@ -52,14 +52,21 @@ export async function generateImage(
     prompt: string;
     intent: GenerateIntent;
     sourceRef?: string;
+    /** 原图直传：单张 Blob（兼容） */
     sourceBlob?: Blob;
+    /** 原图直传：多张 Blob（人物卡三视图生成时全部源图参与；优先于 sourceBlob） */
+    sourceBlobs?: Blob[];
     faceRef?: string;
+    /** 人脸参考 Blob（兼容单张） */
     faceBlob?: Blob;
+    /** 多张人脸参考 Blob（直接上传 1~2 张面部照片；优先于 faceBlob） */
+    faceBlobs?: Blob[];
     aspectRatio: string;
     /** 画质档位 '1K' | '2K' | '4K'；缺省/1K 保持现状（具体像素尺寸、不传 quality） */
     quality?: string;
   },
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onProgress?: (info: { percent: number; statusText?: string }) => void
 ): Promise<GenerateImageResult> {
   const settings = await getSettings();
   const { baseUrl, apiKey, model } = settings.generateApi;
@@ -73,10 +80,18 @@ export async function generateImage(
   const size = useRatioQuality ? params.aspectRatio : (ASPECT_RATIOS[params.aspectRatio] ?? '1024x1024');
   const qualityApi = useRatioQuality ? QUALITY_TO_API[params.quality!] : undefined;
   let finalPrompt = buildGeneratePrompt(params.intent, params.prompt);
-  const hasSource = Boolean(params.sourceBlob || params.sourceRef);
-  const hasFace = Boolean(params.faceBlob || params.faceRef);
+  const sourceBlobs = params.sourceBlobs?.length ? params.sourceBlobs : params.sourceBlob ? [params.sourceBlob] : [];
+  const faceBlobs = params.faceBlobs?.length ? params.faceBlobs : params.faceBlob ? [params.faceBlob] : [];
+  const hasSource = sourceBlobs.length > 0 || Boolean(params.sourceRef);
+  const hasFace = faceBlobs.length > 0 || Boolean(params.faceRef);
   const multiImage = hasSource && hasFace;
-  if (multiImage) {
+  if (params.intent === 'personCard' && sourceBlobs.length >= 2) {
+    // 人物卡多图：明确告知模型这些图都是同一个人，综合提取身份
+    finalPrompt = `本次提交了 ${sourceBlobs.length} 张参考图（image 字段中的多张图片），这些图片均为同一个人（不同角度/场景/表情），请综合所有图片提取该人物稳定一致的面部身份，保证三视图之间身份一致。\n\n${finalPrompt}`;
+  } else if (multiImage && faceBlobs.length >= 2) {
+    // 底图 + 多张人脸参考（直接上传照片）：第一张=构图，第二张及之后=同一人面部身份
+    finalPrompt = `本次提交了 ${1 + faceBlobs.length} 张参考图：第一张（image 字段第一张）是构图与场景参考；第二张及之后的图片（image 字段第二张起）均为同一个人（面部身份参考）。请按提示词要求完成任务。\n\n${finalPrompt}`;
+  } else if (multiImage) {
     // 多图输入时，明确告知模型：第一张=场景/构图参考，第二张=人脸身份参考
     finalPrompt = `本次提交了两张参考图：第一张图（image 字段中的第一张）是构图与场景参考；第二张图（image 字段中的第二张）是人物面部身份参考。请按提示词要求完成任务。\n\n${finalPrompt}`;
   }
@@ -90,38 +105,48 @@ export async function generateImage(
   form.append('size', size);
   if (qualityApi) form.append('quality', qualityApi);
   form.append('n', '1');
-  // 显式请求 b64_json（兼容部分服务商只返回 url 时也能自动处理；多数服务商二者都支持）
-  form.append('response_format', 'b64_json');
+  // 返回格式：2K/4K 走 url（大图 base64 体积 +33%，拖慢接收）；1K/默认保持 b64_json（图小无所谓）。
+  // 图片质量由 size/quality 参数决定，response_format 只影响传输方式，不影响画质。
+  form.append('response_format', useRatioQuality ? 'url' : 'b64_json');
 
   // 原图直传：Blob 直接进 multipart（不转 dataURL、不压缩）；dataURL 仅作兼容
-  if (params.sourceBlob) {
-    form.append('image', params.sourceBlob, 'source.png');
+  // 多张源图（人物卡三视图生成）→ 重复 append image 字段（edits 接口支持最多 16 张）
+  // 第一张保持原名 source.png（与旧版请求逐字节一致，兼容对文件名敏感的服务商）
+  if (sourceBlobs.length > 0) {
+    sourceBlobs.forEach((blob, i) => form.append('image', blob, i === 0 ? 'source.png' : `source-${i}.png`));
   } else if (params.sourceRef) {
     form.append('image', dataUrlToBlob(params.sourceRef), 'source.png');
   }
-  if (params.faceBlob) {
-    form.append('image', params.faceBlob, 'face.png');
+  // 人脸参考：多张（直接上传照片）→ 重复 append；第一张保持原名 face.png
+  if (faceBlobs.length > 0) {
+    faceBlobs.forEach((blob, i) => form.append('image', blob, i === 0 ? 'face.png' : `face-${i}.png`));
   } else if (params.faceRef) {
     form.append('image', dataUrlToBlob(params.faceRef), 'face.png');
   }
 
+  onProgress?.({ percent: 25, statusText: '提交请求…' });
   const resp = await apiFetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${safeKey}` },
     body: form,
   }, GENERATE_TIMEOUT, signal);
 
+  // 响应头已到（同步型中转站在这一步等待生成完成）；异步型中转站会很快返回任务 id
+  onProgress?.({ percent: 30, statusText: '等待生成…' });
+
   // 响应体读取也有超时（响应头到了但 body 迟迟不流完时不会无限等）
+  onProgress?.({ percent: 35, statusText: '读取响应…' });
   const data = await readJson<ImagesResponse | AsyncTaskResponse>(resp, BODY_READ_TIMEOUT, url, signal);
 
   if (!resp.ok) {
-    // 双图不被支持 → 拼图法重试一次
-    if (resp.status === 400 && multiImage) {
+    // 双图不被支持 → 拼图法重试一次（拼图只支持 1 张人脸参考；多张脸时不做降级，直接报错）
+    if (resp.status === 400 && multiImage && faceBlobs.length === 1) {
+      onProgress?.({ percent: 25, statusText: '服务商不支持多图，改用拼图方式重试…' });
       return retryWithComposedImage(url, safeKey, model, finalPrompt, size, qualityApi, {
         sourceRef: params.sourceRef,
-        sourceBlob: params.sourceBlob,
+        sourceBlob: sourceBlobs[0],
         faceRef: params.faceRef,
-        faceBlob: params.faceBlob,
+        faceBlob: faceBlobs[0],
       }, signal);
     }
     throw classifyHttpError(resp.status, data);
@@ -130,7 +155,8 @@ export async function generateImage(
   // 1) 同步返回 b64_json / url
   const syncData = data as ImagesResponse;
   if (Array.isArray(syncData.data)) {
-    const images = await resolveImages(syncData.data, signal);
+    onProgress?.({ percent: 65, statusText: '图片已返回，处理中…' });
+    const images = await resolveImages(syncData.data, signal, onProgress);
     if (images.length > 0) return { images, model };
   }
 
@@ -138,16 +164,18 @@ export async function generateImage(
   const asyncData = data as AsyncTaskResponse;
   const taskUrl = asyncData.task_id || asyncData.taskId || asyncData.id || '';
   if (taskUrl) {
-    const images = await pollTask(safeBase, taskUrl, safeKey, signal);
+    const images = await pollTask(safeBase, taskUrl, safeKey, signal, onProgress);
     if (images.length > 0) return { images, model };
   }
 
   // 3) 直接返回 url
   if (asyncData.url) {
-    return { images: [asyncData.url], model };
+    const images = await resolveImages([{ url: asyncData.url }], signal, onProgress);
+    if (images.length > 0) return { images, model };
   }
   if (typeof asyncData.output === 'string') {
-    return { images: [asyncData.output], model };
+    const images = await resolveImages([{ url: asyncData.output }], signal, onProgress);
+    if (images.length > 0) return { images, model };
   }
   if (Array.isArray(asyncData.output) && asyncData.output.length > 0) {
     // ★ 防御：过滤掉输出里的空串/null，避免把空值当图片编号存进任务
@@ -197,13 +225,15 @@ async function retryWithComposedImage(
 /** 把返回的 url / b64_json 统一转成 dataURL（url 会先抓成 blob 再转，全程带超时，规避 CORS 下载问题） */
 async function resolveImages(
   items: { url?: string; b64_json?: string }[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onProgress?: (info: { percent: number; statusText?: string }) => void
 ): Promise<string[]> {
   const results: string[] = [];
   for (const item of items) {
     if (item.b64_json) {
       results.push(`data:image/png;base64,${item.b64_json}`);
     } else if (item.url) {
+      onProgress?.({ percent: 70, statusText: '下载图片…' });
       try {
         results.push(await fetchImageDataUrl(item.url, DOWNLOAD_TIMEOUT, signal));
       } catch {
@@ -211,6 +241,7 @@ async function resolveImages(
       }
     }
   }
+  onProgress?.({ percent: 75, statusText: '图片已接收' });
   return results;
 }
 
@@ -239,14 +270,24 @@ async function pollTask(
   baseUrl: string,
   taskUrl: string,
   apiKey: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onProgress?: (info: { percent: number; statusText?: string }) => void
 ): Promise<string[]> {
   const fullUrl = taskUrl.startsWith('http') ? taskUrl : `${baseUrl.replace(/\/$/, '')}/${taskUrl.replace(/^\//, '')}`;
   const deadline = Date.now() + GENERATE_TIMEOUT;
+  const startedAt = Date.now();
   // 成功/失败用宽集合匹配（大小写、常见变体）；其余一律视为仍在处理
   const SUCCESS = ['succeeded', 'success', 'successful', 'completed', 'complete', 'done', 'finished', 'finish'];
   const FAILED = ['failed', 'error', 'fail', 'failure', 'cancelled', 'canceled', 'timeout', 'expired', 'rejected'];
+  let round = 0;
   while (Date.now() < deadline) {
+    round++;
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    // 轮询阶段进度：40 → 60，随轮次递增
+    onProgress?.({
+      percent: Math.min(40 + round * 2, 60),
+      statusText: `生成中（已等待 ${elapsed} 秒）`,
+    });
     const resp = await apiFetch(fullUrl, {
       method: 'GET',
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -263,7 +304,10 @@ async function pollTask(
         throw new ApiError('TASK_FAILED', '生成任务失败');
       }
       if (SUCCESS.includes(status) || images.length > 0) {
-        if (images.length > 0) return images;
+        if (images.length > 0) {
+          onProgress?.({ percent: 65, statusText: '图片已返回，处理中…' });
+          return images;
+        }
         // 状态成功但没有图 → 继续等（有的服务商状态先于图片就绪）
       }
       // pending/running/unknown → 继续轮询

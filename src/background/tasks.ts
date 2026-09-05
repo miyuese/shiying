@@ -43,6 +43,10 @@ function sanitizeTask(t: Task): Task {
       // dataURL 字段清空，调用方应改用 blobKey
       continue;
     }
+    // faceRefs：直接上传的多张人脸参考 dataURL 数组，同样清空（落盘引用见 persistRegenInputs）
+    if (k === 'faceRefs' && Array.isArray(v) && v.every((x) => typeof x === 'string' && (x as string).startsWith('data:'))) {
+      continue;
+    }
     cleaned[k] = v;
   }
   return { ...t, inputs: cleaned };
@@ -133,7 +137,7 @@ export async function refreshDeadline(id: string): Promise<Task | undefined> {
 /** 更新任务状态（inputs 用于把 dataURL 换成 blobKey 引用，供结果栏「再生成」复用） */
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<Task, 'status' | 'result' | 'error' | 'progress' | 'inputs'>>
+  patch: Partial<Pick<Task, 'status' | 'result' | 'error' | 'progress' | 'inputs' | 'statusText'>>
 ): Promise<Task | undefined> {
   const tasks = await loadTasks();
   const idx = tasks.findIndex((t) => t.id === id);

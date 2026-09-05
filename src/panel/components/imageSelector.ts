@@ -2,15 +2,19 @@
  * 图片选择器组件
  * 来源切换：相册 / 上传
  * 暗房样式：取景框缩略图 + chip 来源按钮
+ * opts.previewSrc：显示用图覆盖（如高斯模糊后的预览图）；opts.blurAmount：>0 时显示模糊角标
  */
 
 import { getState, setState } from '../state';
 import { send, toast } from '../ui';
 import { setHtml } from '../../shared/dom';
 
-export function renderImageSelector(container: HTMLElement): void {
+export function renderImageSelector(
+  container: HTMLElement,
+  opts?: { previewSrc?: string | null; blurAmount?: number }
+): void {
   const s = getState();
-  const selected = s.selectedImage;
+  const selected = opts?.previewSrc ?? s.selectedImage;
 
   setHtml(
     container,
@@ -18,7 +22,7 @@ export function renderImageSelector(container: HTMLElement): void {
     <div style="display:flex;gap:12px;align-items:center;">
       ${
         selected
-          ? `<div class="frame" style="width:72px;height:72px;flex-shrink:0;"><img src="${selected}" alt="已选图"></div>`
+          ? `<div class="frame" style="width:72px;height:72px;flex-shrink:0;"><img src="${selected}" alt="已选图" data-preview="1"></div>`
           : `<div class="frame" style="width:72px;height:72px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);"><i data-lucide="image" data-size="24"></i></div>`
       }
       <div style="flex:1;min-width:0;">
@@ -27,7 +31,11 @@ export function renderImageSelector(container: HTMLElement): void {
           <button class="chip" data-src="upload">上传</button>
           ${selected ? `<button class="chip" data-src="clear" style="color:var(--ink-3);">清除</button>` : ''}
         </div>
-        <p class="micro" style="margin:8px 0 0;">${s.selectedImageMeta?.source ?? '未选择图片'}</p>
+        <p class="micro" style="margin:8px 0 0;">${
+          opts?.blurAmount
+            ? `模糊 ${opts.blurAmount}% · 生成时身份只来自人物卡`
+            : (s.selectedImageMeta?.source ?? '未选择图片')
+        }</p>
       </div>
     </div>
   `

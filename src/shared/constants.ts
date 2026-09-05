@@ -19,7 +19,7 @@ export const IMAGE_JPEG_QUALITY = 0.9;
 export const COLLECT_MAX_EDGE = 1200;
 
 /** 人物卡限制 */
-export const PERSON_CARD_MAX_SOURCES = 4;
+export const PERSON_CARD_MAX_SOURCES = 5;
 export const PERSON_CARD_MAX_COUNT = 20;
 export const PERSON_CARD_ASPECT = '16:9';
 

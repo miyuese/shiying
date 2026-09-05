@@ -138,13 +138,13 @@ async function handle(msg: MsgEnvelope): Promise<unknown> {
       if (await hasActiveTaskOfType('personCard')) throw new Error('PERSON_CARD_BUSY');
       const result = await personCards.createPersonCard(p.images ?? [], p.name, p.blobKeys);
       // 立刻异步触发三视图卡生成（不阻塞 UI）。
-      // 源图 Blob 直传：直接用卡自己的第一张源图 blobKey，不复制临时图，不压缩。
-      const sourceKey = result.blobKeys[0];
-      if (result.card && sourceKey) {
+      // 全部源图 Blob 直传：卡上的所有源图都作为身份参考（多角度综合，相似度更稳），不复制临时图，不压缩。
+      const sourceKeys = result.blobKeys;
+      if (result.card && sourceKeys.length > 0) {
         const inputs: GeneratePayload = {
           intent: 'personCard',
           prompt: '',
-          sourceBlobKey: sourceKey,
+          sourceBlobKeys: sourceKeys, // 多张源图全部参与三视图生成
           keepSourceBlob: true, // 源图是人物卡资产，成功/失败都不删
           aspectRatio: '16:9',
           cardId: result.card.id,
@@ -393,6 +393,22 @@ async function persistRegenInputs(taskId: string, p: GeneratePayload): Promise<G
       resolved.faceRef = undefined;
       newKeys.push(key);
     }
+    // 多张人脸参考（直接上传的照片）：逐张落盘为 regen-face:{taskId}:{i}
+    if (!resolved.faceBlobKeys?.length && resolved.faceRefs?.length) {
+      const keys: string[] = [];
+      for (let i = 0; i < resolved.faceRefs.length; i++) {
+        const ref = resolved.faceRefs[i]!;
+        if (!ref.startsWith('data:')) continue;
+        const key = `${REGEN_FACE_PREFIX}${taskId}:${i}`;
+        await putImage(key, await toBlob(ref));
+        keys.push(key);
+        newKeys.push(key);
+      }
+      if (keys.length) {
+        resolved.faceBlobKeys = keys;
+        resolved.faceRefs = undefined;
+      }
+    }
   } catch {
     /* 落盘失败不阻塞生成，仅失去「再生成」能力 */
   }
@@ -413,12 +429,15 @@ async function pruneRegenBlobs(): Promise<void> {
     const referenced = new Set<string>();
     const keepIds = new Set(all.slice(0, REGEN_KEEP).map((t) => t.id));
     for (const t of all) {
-      const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string };
+      const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string; faceBlobKeys?: string[] };
       if (typeof inputs.sourceBlobKey === 'string' && inputs.sourceBlobKey.startsWith(REGEN_SRC_PREFIX)) {
         referenced.add(inputs.sourceBlobKey);
       }
       if (typeof inputs.faceBlobKey === 'string' && inputs.faceBlobKey.startsWith(REGEN_FACE_PREFIX)) {
         referenced.add(inputs.faceBlobKey);
+      }
+      for (const k of inputs.faceBlobKeys ?? []) {
+        if (typeof k === 'string' && k.startsWith(REGEN_FACE_PREFIX)) referenced.add(k);
       }
     }
     const stale: string[] = [];
@@ -428,12 +447,15 @@ async function pruneRegenBlobs(): Promise<void> {
     // 超出保留数量：任务还在，但输入图该回收了
     for (const t of all) {
       if (keepIds.has(t.id)) continue;
-      const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string };
+      const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string; faceBlobKeys?: string[] };
       if (typeof inputs.sourceBlobKey === 'string' && inputs.sourceBlobKey.startsWith(REGEN_SRC_PREFIX)) {
         stale.push(inputs.sourceBlobKey);
       }
       if (typeof inputs.faceBlobKey === 'string' && inputs.faceBlobKey.startsWith(REGEN_FACE_PREFIX)) {
         stale.push(inputs.faceBlobKey);
+      }
+      for (const k of inputs.faceBlobKeys ?? []) {
+        if (typeof k === 'string' && k.startsWith(REGEN_FACE_PREFIX)) stale.push(k);
       }
     }
     if (stale.length) await deleteImages([...new Set(stale)]).catch(() => {});
@@ -453,11 +475,20 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
   await updateTask(taskId, { status: 'running', progress: 5 });
 
   // 原图直传：直接把 blobKey 对应的 Blob 取出来交给 provider（不经 dataURL，保持原始质量）
-  let sourceBlob: Blob | undefined;
-  let faceBlob: Blob | undefined;
+  // 人物卡场景支持多张源图（sourceBlobKeys）全部参与生成；单图场景走 sourceBlobKey
+  const sourceKeys = p.sourceBlobKeys?.length ? p.sourceBlobKeys : p.sourceBlobKey ? [p.sourceBlobKey] : [];
+  const faceKeys = p.faceBlobKeys?.length ? p.faceBlobKeys : p.faceBlobKey ? [p.faceBlobKey] : [];
+  let sourceBlobs: Blob[] = [];
+  let faceBlobs: Blob[] = [];
   try {
-    if (p.sourceBlobKey) sourceBlob = await getImage(p.sourceBlobKey);
-    if (p.faceBlobKey) faceBlob = await getImage(p.faceBlobKey);
+    for (const k of sourceKeys) {
+      const b = await getImage(k);
+      if (b) sourceBlobs.push(b);
+    }
+    for (const k of faceKeys) {
+      const b = await getImage(k);
+      if (b) faceBlobs.push(b);
+    }
   } catch {
     /* 取图失败继续，provider 端会报错 */
   }
@@ -476,15 +507,19 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
             prompt: p.prompt,
             intent: p.intent,
             sourceRef: p.sourceRef, // 兼容旧调用（dataURL）
-            sourceBlob, // 原图直传（优先）
+            sourceBlobs, // 原图直传（优先；人物卡场景为多张）
             faceRef: p.faceRef,
-            faceBlob,
+            faceBlobs, // 人脸参考（人物卡 1 张 / 直接上传照片 1~2 张）
             aspectRatio: p.aspectRatio,
             quality: p.quality,
           },
-          controller.signal // 看门狗/强制失败可中止请求
+          controller.signal, // 看门狗/强制失败可中止请求
+          (info) => {
+            // 进度细分：把 20%→80% 拆成 提交/等待/接收/下载 各阶段，界面不再像卡死
+            void updateTask(taskId, { progress: info.percent, statusText: info.statusText }).catch(() => {});
+          }
         );
-        await updateTask(taskId, { progress: 80 });
+        await updateTask(taskId, { progress: 80, statusText: '保存结果…' });
 
         // 结果 blob 入库
         const blobKeys: string[] = [];
@@ -505,18 +540,19 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
         // 拍一套 → 前端切分（此处由面板执行 splitPhotoSuiteGrid，见 panel/views/suite.ts）
         // 人物卡 → 把三视图图挂到人物卡上
         if (p.intent === 'personCard' && p.cardId && blobKeys[0]) {
+          await updateTask(taskId, { progress: 90, statusText: '挂载到人物卡…' });
           await personCards.attachCardImage(p.cardId, blobKeys[0]);
         }
 
         // 清理临时 blob（keepSourceBlob=true 时源图是人物卡资产，不能删）
-        if (!p.keepSourceBlob && p.sourceBlobKey) {
-          await deleteImages([p.sourceBlobKey]).catch(() => {});
+        if (!p.keepSourceBlob && sourceKeys.length) {
+          await deleteImages(sourceKeys).catch(() => {});
         }
-        if (!p.keepSourceBlob && p.faceBlobKey) {
-          await deleteImages([p.faceBlobKey]).catch(() => {});
+        if (!p.keepSourceBlob && faceKeys.length) {
+          await deleteImages(faceKeys).catch(() => {});
         }
 
-        await updateTask(taskId, { result: { blobKeys }, progress: 100, status: 'done' });
+        await updateTask(taskId, { result: { blobKeys }, progress: 100, status: 'done', statusText: '完成' });
         return gen;
       });
 
@@ -526,7 +562,7 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
       attempts++;
       if (isTimeout(err) && attempts < MAX_ATTEMPTS) {
         // 自动重试 1 次：同一张原图，重置状态与 7 分钟截止时间
-        await updateTask(taskId, { status: 'running', progress: 10 });
+        await updateTask(taskId, { status: 'running', progress: 10, statusText: '自动重试中…' });
         await refreshDeadline(taskId);
         continue;
       }
@@ -540,8 +576,8 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
       await updateTask(taskId, { status: 'failed', error: finalMsg });
       // 清理临时 blob（keepSourceBlob 的源图保留，便于重试）
       const tempKeys: string[] = [];
-      if (!p.keepSourceBlob && p.sourceBlobKey) tempKeys.push(p.sourceBlobKey);
-      if (!p.keepSourceBlob && p.faceBlobKey) tempKeys.push(p.faceBlobKey);
+      if (!p.keepSourceBlob) tempKeys.push(...sourceKeys);
+      if (!p.keepSourceBlob) tempKeys.push(...faceKeys);
       if (tempKeys.length) await deleteImages(tempKeys).catch(() => {});
       // 人物卡生成失败 → 记录到卡片上，UI 可显示
       if (p.intent === 'personCard' && p.cardId) {

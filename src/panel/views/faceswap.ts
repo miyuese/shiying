@@ -1,17 +1,18 @@
 /**
  * 换脸 Tab
- * 源图 + 人物卡 → 换脸
+ * 源图 + 面部参考（人物卡或直接上传 1~2 张照片）→ 换脸
  * 暗房：编号化区块 + 取景框结果 + Lucide 图标
  */
 
 import { getState, setState } from '../state';
 import { send, toast } from '../ui';
 import { renderImageSelector } from '../components/imageSelector';
+import { renderFaceReferenceSelector } from '../components/faceReferenceSelector';
 import { modelBoxHtml } from '../components/modelBox';
 import { qualitySelectHtml, currentQuality, bindQualitySelect } from '../components/qualitySelector';
 import { renderInlineProgress } from '../components/taskProgress';
 import { iconSvg } from '../../shared/icons';
-import type { Task } from '../../shared/types';
+import type { GeneratePayload, Task } from '../../shared/types';
 
 const SWAP_BTN = () => `${iconSvg('user-round', { size: 14, className: 'lucide' })} 换脸`;
 
@@ -35,7 +36,7 @@ export function renderFaceswapView(container: HTMLElement): void {
       <section class="work-section">
         <div class="section-head">
           <span class="section-num">02</span>
-          <p class="section-label" style="margin:0;">人物卡 · 要换进去的脸</p>
+          <p class="section-label" style="margin:0;">面部参考 · 要换进去的脸</p>
           <span class="link" id="btn-to-cards" style="font-size:11px;margin-left:auto;">管理人物卡 →</span>
         </div>
         <div id="card-selector"></div>
@@ -64,7 +65,7 @@ export function renderFaceswapView(container: HTMLElement): void {
   `;
 
   renderImageSelector(container.querySelector('#img-selector')!);
-  renderFaceCardSelector(container.querySelector('#card-selector')!);
+  renderFaceReferenceSelector(container.querySelector('#card-selector')!);
   bindQualitySelect(container);
 
   container.querySelector('#btn-to-cards')!.addEventListener('click', () => {
@@ -77,8 +78,8 @@ export function renderFaceswapView(container: HTMLElement): void {
       toast('请先选择源图');
       return;
     }
-    if (!state.selectedCardId) {
-      toast('请选择一张人物卡');
+    if (!state.selectedCardId && state.directFaceImages.length === 0) {
+      toast('请选择人物卡或上传面部参考照片');
       return;
     }
     const aspect = (container.querySelector('#sel-aspect') as HTMLSelectElement).value;
@@ -87,16 +88,21 @@ export function renderFaceswapView(container: HTMLElement): void {
     btn.disabled = true;
     btn.textContent = '换脸中…';
     try {
-      const card = await send<{ dataUrl: string }>('person-card-get', { id: state.selectedCardId });
       // 换脸模板（FACESWAP_PROMPT_TEMPLATE）自足，不需要反推 API
-      const { taskId } = await send<{ taskId: string }>('generate-image', {
+      const payload: GeneratePayload = {
         prompt: '',
         intent: 'faceswap',
         sourceRef: state.selectedImage,
-        faceRef: card.dataUrl,
         aspectRatio: aspect,
         quality,
-      });
+      };
+      if (state.directFaceImages.length > 0) {
+        payload.faceRefs = state.directFaceImages; // 直接上传照片（1~2 张）优先于人物卡
+      } else {
+        const card = await send<{ dataUrl: string }>('person-card-get', { id: state.selectedCardId });
+        payload.faceRef = card.dataUrl;
+      }
+      const { taskId } = await send<{ taskId: string }>('generate-image', payload);
       // 立即在本页渲染「排队中」卡片，让用户马上看到任务已启动
       pollingTaskId = taskId;
       lastTaskSnapshot = { id: taskId, type: 'faceswap', status: 'pending' } as Task;
@@ -118,56 +124,6 @@ export function renderFaceswapView(container: HTMLElement): void {
     const snap = active && active.id === pollingTaskId ? active : lastTaskSnapshot;
     if (snap) renderInlineProgress(resultBox, snap);
   }
-}
-
-/** 换脸专用人物卡选择（单卡点击切换） */
-function renderFaceCardSelector(container: HTMLElement): void {
-  const s = getState();
-  const cards = s.personCards;
-  if (cards.length === 0) {
-    container.innerHTML = `
-      <div class="card" style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:12px;color:var(--ink-3);">还没有人物卡</span>
-        <button class="link" id="go-create-card">去创建 →</button>
-      </div>
-    `;
-    container.querySelector('#go-create-card')!.addEventListener('click', () => {
-      setState({ tab: 'personCard' });
-    });
-    return;
-  }
-
-  container.innerHTML = cards
-    .map(
-      (c) => `
-      <div class="card card-hover" data-card-id="${c.id}" style="margin-bottom:6px;display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;${
-        c.id === s.selectedCardId ? 'border-color:var(--border-blue);background:var(--blue-soft);' : ''
-      }">
-        <div class="face-thumb" style="width:36px;height:36px;" data-card-thumb="${c.id}"></div>
-        <div style="flex:1;min-width:0;">
-          <p style="font-size:12px;color:var(--ink-1);margin:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</p>
-          <p style="font-size:10px;color:var(--ink-3);margin:0;">${c.sourceCount} 张源图</p>
-        </div>
-        ${c.isDefault ? '<span class="pill pill-blue">默认</span>' : ''}
-      </div>
-    `
-    )
-    .join('');
-
-  container.querySelectorAll<HTMLElement>('[data-card-id]').forEach((el) => {
-    el.addEventListener('click', () => {
-      setState({ selectedCardId: el.dataset.cardId! });
-      renderFaceCardSelector(container);
-    });
-    const thumb = container.querySelector<HTMLElement>(`[data-card-thumb="${el.dataset.cardId}"]`);
-    if (thumb) {
-      void send<{ dataUrl: string }>('person-card-get', { id: el.dataset.cardId })
-        .then((r) => {
-          thumb.innerHTML = `<img src="${r.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-        })
-        .catch(() => {});
-    }
-  });
 }
 
 function pollSwapTask(taskId: string): void {
@@ -219,7 +175,7 @@ function pollSwapTask(taskId: string): void {
               <p class="section-label" style="margin:0;">换脸结果</p>
             </div>
             <div class="frame">
-              <img src="${dataUrl}" alt="换脸结果">
+              <img src="${dataUrl}" alt="换脸结果" data-preview="1">
               <span class="frame-mark">Face Swap</span>
             </div>
             <div style="display:flex;gap:8px;margin-top:10px;">

@@ -74,6 +74,8 @@ export interface Task {
   updatedAt: number;
   /** 进度 0-100（可选） */
   progress?: number;
+  /** 阶段状态文字（如「生成中」「接收图片…」），供进度条展示 */
+  statusText?: string;
   /** 硬性截止时间戳（超时判定用，不依赖 setTimeout） */
   deadline?: number;
 }
@@ -153,10 +155,19 @@ export interface GeneratePayload {
   sourceRef?: string;
   /** 人脸参考图 dataURL（与 faceBlobKey 二选一） */
   faceRef?: string;
+  /** 多张人脸参考图 dataURL（直接上传的面部参考照片，同一人；优先于 faceRef） */
+  faceRefs?: string[];
   /** 构图参考图 IndexedDB blobKey（推荐：避免占 storage 配额 + 原图直传不压缩） */
   sourceBlobKey?: string;
+  /**
+   * 多张构图/身份参考图 IndexedDB blobKey（intent=personCard 时使用：
+   * 把卡上全部源图都作为三视图生成的身份参考；优先于 sourceBlobKey）
+   */
+  sourceBlobKeys?: string[];
   /** 人脸参考图 IndexedDB blobKey */
   faceBlobKey?: string;
+  /** 多张人脸参考图 IndexedDB blobKey（persistRegenInputs 把 faceRefs 落盘后回填；优先于 faceBlobKey） */
+  faceBlobKeys?: string[];
   aspectRatio: string;
   /** 画质档位（'1K' | '2K' | '4K'；缺省/1K 保持现状：具体像素尺寸、不传 quality） */
   quality?: string;
@@ -191,7 +202,7 @@ export interface AlbumDeletePayload {
 }
 
 export interface PersonCardCreatePayload {
-  /** dataURL 列表（1-4 张，兼容旧调用）；新面板走 blobKeys 原图直传 */
+  /** dataURL 列表（1-5 张，兼容旧调用）；新面板走 blobKeys 原图直传 */
   images?: string[];
   /** 已由面板存入 IndexedDB 的源图 blobKey 列表（优先于 images） */
   blobKeys?: string[];

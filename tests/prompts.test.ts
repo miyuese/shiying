@@ -35,14 +35,14 @@ describe('反推方案', () => {
 
 describe('生成功能模板', () => {
   it('换脸模板强调双图分工', () => {
-    expect(FACESWAP_PROMPT_TEMPLATE).toContain('图2');
+    expect(FACESWAP_PROMPT_TEMPLATE).toContain('第二张及之后的图片');
     expect(FACESWAP_PROMPT_TEMPLATE).toContain('脸部身份来源');
     expect(FACESWAP_PROMPT_TEMPLATE).toContain('贴脸');
   });
 
-  it('换脸模板：图1=构图与场景参考（底图）、图2=人物面部身份参考，不得颠倒（回归 bug 修复）', () => {
+  it('换脸模板：图1=构图与场景参考（底图）、第二张起=人物面部身份参考（同一个人），不得颠倒（回归 bug 修复）', () => {
     expect(FACESWAP_PROMPT_TEMPLATE).toContain('图1（即 image 字段中的第一张：构图与场景参考）作为唯一基础图');
-    expect(FACESWAP_PROMPT_TEMPLATE).toContain('图2（即 image 字段中的第二张：人物面部身份参考）只作为脸部身份来源');
+    expect(FACESWAP_PROMPT_TEMPLATE).toContain('第二张及之后的图片（即 image 字段中的第二张起：人物面部身份参考，均为同一个人）只作为脸部身份来源');
     expect(FACESWAP_PROMPT_TEMPLATE).not.toContain('以图2作为唯一基础图');
     expect(FACESWAP_PROMPT_TEMPLATE).not.toContain('图1只作为脸部身份来源');
   });
@@ -63,9 +63,9 @@ describe('生成功能模板', () => {
     expect(SUITE_PROMPT_TEMPLATE).toContain('Consistency is the highest priority');
   });
 
-  it('拍一套模板：图序映射 + 人物卡仅作适度面部参考（不锁定细节）', () => {
+  it('拍一套模板：图序映射 + 面部参考（人物卡或直接照片）仅作适度参考（不锁定细节）', () => {
     expect(SUITE_PROMPT_TEMPLATE).toContain('the first image in the image field');
-    expect(SUITE_PROMPT_TEMPLATE).toContain('a person\'s face reference card');
+    expect(SUITE_PROMPT_TEMPLATE).toContain('photos of the same person');
     expect(SUITE_PROMPT_TEMPLATE).toContain('light facial-identity guide');
     expect(SUITE_PROMPT_TEMPLATE).toContain('without over-locking facial details');
   });
@@ -89,7 +89,7 @@ describe('生成功能模板', () => {
     expect(redraw).toContain('测试提示词');
     expect(redraw).toContain('全新画面');
     const faceswap = buildGeneratePrompt('faceswap', '测试提示词');
-    expect(faceswap).toContain('图2');
+    expect(faceswap).toContain('第二张及之后的图片');
     const suite = buildGeneratePrompt('suite', 'x');
     expect(suite).toBe(SUITE_PROMPT_TEMPLATE);
   });

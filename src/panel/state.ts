@@ -16,6 +16,12 @@ export interface PanelState {
   /** 当前选中人物卡 */
   personCards: PersonCard[];
   selectedCardId: string;
+  /** 直接上传的面部参考照片 dataURL（1~2 张；与人物卡互斥，有值则生成时优先用作面部参考） */
+  directFaceImages: string[];
+  /** 反推重绘页：高斯模糊强度 0-100（生成时以模糊图作构图参考，身份只来自人物卡） */
+  blurAmount: number;
+  /** 模糊后的源图 dataURL（blurAmount > 0 且有图时） */
+  blurredImage: string | null;
   /** 结果区 */
   results: Task[];
   loading: boolean;
@@ -34,6 +40,9 @@ export const initialState: PanelState = {
   selectedImageMeta: null,
   personCards: [],
   selectedCardId: '',
+  directFaceImages: [],
+  blurAmount: 0,
+  blurredImage: null,
   results: [],
   loading: false,
   suiteCardId: '',

@@ -1,6 +1,6 @@
 /**
  * 人物卡 Tab
- * 上传 1~4 图 → 建卡（生成三视图卡）→ 命名/默认/删除
+ * 上传 1~5 图 → 建卡（全部源图参与生成三视图卡）→ 命名/默认/删除
  * 暗房：取景框头像 + 三态状态行（check/alert-triangle/clock）+ overlay/modal-sheet 弹窗
  */
 
@@ -69,7 +69,7 @@ function renderCardList(container: HTMLElement): void {
       <div class="empty">
         <div class="empty-icon">${iconSvg('user-round', { size: 22, className: 'lucide' })}</div>
         <p>还没有人物卡</p>
-        <p style="font-size:11px;margin-top:4px;">上传 1~4 张人物照片，生成标准三视图身份卡</p>
+        <p style="font-size:11px;margin-top:4px;">上传 1~${PERSON_CARD_MAX_SOURCES} 张人物照片，生成标准三视图身份卡</p>
         <button class="btn btn-secondary" style="margin-top:12px;font-size:12px;" id="empty-new">去创建</button>
       </div>
     `;
@@ -112,7 +112,7 @@ function renderCardList(container: HTMLElement): void {
     const id = el.dataset.thumb!;
     void send<{ dataUrl: string }>('person-card-get', { id })
       .then((r) => {
-        el.innerHTML = `<img src="${r.dataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+        el.innerHTML = `<img src="${r.dataUrl}" data-preview="1" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
       })
       .catch(() => {});
   });
@@ -138,14 +138,15 @@ function renderCardList(container: HTMLElement): void {
     });
   });
 
-  // 重新生成三视图卡（原图直传：直接用卡上源图 blobKey，不再把图片从 IndexedDB 取成 dataURL 来回绕）
+  // 重新生成三视图卡（原图直传：用卡上全部源图 blobKey 作为多角度身份参考，不再只取第一张）
   container.querySelectorAll<HTMLElement>('[data-regenerate]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const cardId = btn.dataset.regenerate!;
       try {
         const card = await send<{ card: PersonCard }>('person-card-get', { id: cardId });
-        const sourceKey = card.card.blobKeys[0];
-        if (!sourceKey) {
+        // 只用源图（前 sourceCount 张），排除已挂上的旧三视图卡
+        const sourceKeys = card.card.blobKeys.slice(0, card.card.sourceCount);
+        if (sourceKeys.length === 0) {
           toast('卡片没有源图，无法重新生成');
           return;
         }
@@ -154,7 +155,7 @@ function renderCardList(container: HTMLElement): void {
         await send('generate-image', {
           prompt: '',
           intent: 'personCard',
-          sourceBlobKey: sourceKey,
+          sourceBlobKeys: sourceKeys,
           keepSourceBlob: true, // 源图是卡片资产，生成完不删除
           aspectRatio: '16:9',
           cardId,

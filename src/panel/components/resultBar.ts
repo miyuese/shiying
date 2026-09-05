@@ -51,7 +51,7 @@ export function renderResultBar(container: HTMLElement): void {
   if (thumb && latest.result?.blobKeys?.[0]) {
     void send<{ dataUrl: string }>('image-by-key', { key: latest.result.blobKeys[0] })
       .then((r) => {
-        thumb.innerHTML = `<img src="${r.dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+        thumb.innerHTML = `<img src="${r.dataUrl}" data-preview="1" style="width:100%;height:100%;object-fit:cover;">`;
       })
       .catch(() => {});
   }
@@ -128,6 +128,7 @@ async function regenerate(task: Task): Promise<void> {
     intent,
     sourceBlobKey: inputs.sourceBlobKey,
     faceBlobKey: inputs.faceBlobKey,
+    faceBlobKeys: inputs.faceBlobKeys,
     aspectRatio: inputs.aspectRatio ?? '3:4',
     quality: inputs.quality,
     keepSourceBlob: true, // 源图是再生成资产，成功/失败都不删（由后台 GC 统一回收）

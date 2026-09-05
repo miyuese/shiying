@@ -139,6 +139,28 @@ export async function composeFaceBadge(
   return await blobToDataUrl(out);
 }
 
+/**
+ * 高斯模糊（面板侧）：percent 0-100，100% ≈ 图宽 1/6 的模糊半径。
+ * 用途：把源图人脸弱化，强制生成时面部身份只来自人物卡（不照抄源图）。
+ * 先画原图打底再画模糊层覆盖，避免模糊边缘出现透明/黑边。
+ */
+export async function blurImageDataUrl(dataUrl: string, percent: number): Promise<string> {
+  const p = Math.min(100, Math.max(0, percent));
+  if (p <= 0) return dataUrl;
+  const img = await loadImage(dataUrl);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  const radius = Math.max(1, (p / 100) * (img.width / 6));
+  ctx.drawImage(img, 0, 0); // 原图打底
+  ctx.filter = `blur(${radius}px)`;
+  ctx.drawImage(img, 0, 0); // 模糊层覆盖
+  ctx.filter = 'none';
+  return canvas.toDataURL('image/jpeg', 0.92);
+}
+
 /** 随机 id */
 export function genId(prefix = ''): string {
   return (

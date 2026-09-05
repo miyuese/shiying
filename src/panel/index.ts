@@ -13,6 +13,7 @@ import { renderSuiteView } from './views/suite';
 import { renderAlbumView } from './views/album';
 import { renderPersonCardView } from './views/personCard';
 import { renderResultBar } from './components/resultBar';
+import { initImagePreview } from './components/imagePreview';
 import { configStatus } from '../shared/configStatus';
 import type { Settings, Task, PersonCard } from '../shared/types';
 import { ASPECT_OPTIONS, GENERATE_MODEL_OPTIONS, PROFILE_OPTIONS } from '../shared/constants';
@@ -75,6 +76,8 @@ async function init(): Promise<void> {
   renderShell();
   subscribe(() => renderShell());
   initTaskProgress();
+  // 悬浮大图预览（data-preview 全局委托，重渲染后无需重新绑定）
+  initImagePreview();
 
   // 长连接接收任务广播
   const port = chrome.runtime.connect({ name: WORKBENCH_CHANNEL });

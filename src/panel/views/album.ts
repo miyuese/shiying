@@ -99,7 +99,7 @@ async function loadMore(container: HTMLElement, replace: boolean): Promise<void>
       const id = el.dataset.load!;
       void send<{ dataUrl: string }>('album-get', { id })
         .then((r) => {
-          el.innerHTML = `<img src="${r.dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+          el.innerHTML = `<img src="${r.dataUrl}" data-preview="1" style="width:100%;height:100%;object-fit:cover;">`;
         })
         .catch(() => {});
     });

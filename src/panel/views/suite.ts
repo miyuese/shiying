@@ -7,12 +7,13 @@
 import { getState, setState } from '../state';
 import { send, toast } from '../ui';
 import { renderImageSelector } from '../components/imageSelector';
+import { renderFaceReferenceSelector } from '../components/faceReferenceSelector';
 import { modelBoxHtml } from '../components/modelBox';
 import { qualitySelectHtml, currentQuality, bindQualitySelect } from '../components/qualitySelector';
 import { renderInlineProgress } from '../components/taskProgress';
 import { iconSvg } from '../../shared/icons';
 import { splitPhotoSuiteGrid } from '../../shared/utils/image';
-import type { Task } from '../../shared/types';
+import type { GeneratePayload, Task } from '../../shared/types';
 
 const SUITE_BTN = () =>
   `${iconSvg('layout-grid', { size: 14, className: 'lucide' })} 拍一套 · 生成四宫格`;
@@ -37,7 +38,7 @@ export function renderSuiteView(container: HTMLElement): void {
       <section class="work-section">
         <div class="section-head">
           <span class="section-num">02</span>
-          <p class="section-label" style="margin:0;">人物卡 · 面部参考（可选）</p>
+          <p class="section-label" style="margin:0;">面部参考（可选）</p>
         </div>
         <div id="card-selector"></div>
       </section>
@@ -59,7 +60,7 @@ export function renderSuiteView(container: HTMLElement): void {
   `;
 
   renderImageSelector(container.querySelector('#img-selector')!);
-  renderSuiteCardSelector(container.querySelector('#card-selector')!);
+  renderFaceReferenceSelector(container.querySelector('#card-selector')!, { suiteMode: true });
   bindQualitySelect(container);
 
   container.querySelector('#btn-suite')!.addEventListener('click', async () => {
@@ -74,21 +75,24 @@ export function renderSuiteView(container: HTMLElement): void {
     btn.disabled = true;
     btn.textContent = '生成四宫格中…';
     try {
-      // 取人物卡（可选，用拍一套页自己的选择，不继承全局默认卡）
-      let faceRef: string | undefined;
-      const faceCard = state.personCards.find((c) => c.id === state.suiteCardId);
-      if (faceCard) {
-        const card = await send<{ dataUrl: string }>('person-card-get', { id: faceCard.id });
-        faceRef = card.dataUrl;
-      }
-      const { taskId } = await send<{ taskId: string }>('generate-image', {
+      // 面部参考（可选）：直接上传照片（1~2 张）优先；否则用拍一套页自己的卡片选择，不继承全局默认卡
+      const payload: GeneratePayload = {
         prompt: '',
         intent: 'suite',
         sourceRef: state.selectedImage,
-        faceRef,
         aspectRatio: aspect,
         quality,
-      });
+      };
+      if (state.directFaceImages.length > 0) {
+        payload.faceRefs = state.directFaceImages;
+      } else if (state.suiteCardId) {
+        const faceCard = state.personCards.find((c) => c.id === state.suiteCardId);
+        if (faceCard) {
+          const card = await send<{ dataUrl: string }>('person-card-get', { id: faceCard.id });
+          payload.faceRef = card.dataUrl;
+        }
+      }
+      const { taskId } = await send<{ taskId: string }>('generate-image', payload);
       // 立即在本页渲染「排队中」卡片，让用户马上看到任务已启动
       pollingTaskId = taskId;
       lastTaskSnapshot = { id: taskId, type: 'suite', status: 'pending' } as Task;
@@ -110,58 +114,6 @@ export function renderSuiteView(container: HTMLElement): void {
     const snap = active && active.id === pollingTaskId ? active : lastTaskSnapshot;
     if (snap) renderInlineProgress(resultBox, snap);
   }
-}
-
-function renderSuiteCardSelector(container: HTMLElement): void {
-  const s = getState();
-  const cards = s.personCards;
-  if (cards.length === 0) {
-    container.innerHTML = `
-      <div class="card" style="padding:10px 14px;">
-        <span style="font-size:12px;color:var(--ink-3);">没有人脸参考（可选，可不选直接生成）</span>
-      </div>
-    `;
-    return;
-  }
-  const selected = s.suiteCardId;
-  container.innerHTML = `
-    <p class="micro" style="margin-bottom:8px;">${
-      selected
-        ? `已选 <strong class="num" style="color:var(--ink-1);">${cards.find((c) => c.id === selected)?.name ?? '人物卡'}</strong>，再点一下可取消`
-        : '默认不选 · 点卡片选中，再点一下取消'
-    }</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;">
-      ${cards
-        .map(
-          (c) => `
-          <div class="card card-hover" data-card-id="${c.id}" style="cursor:pointer;padding:5px;text-align:center;${
-            c.id === selected ? 'border-color:var(--border-blue);background:var(--blue-soft);' : ''
-          }">
-            <div class="ratio-box" style="border-radius:6px;" data-card-thumb="${c.id}"></div>
-            <div style="font-size:10px;color:${c.id === selected ? 'var(--ink-1)' : 'var(--ink-3)'};margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-              ${c.id === selected ? iconSvg('check', { size: 11, className: 'lucide' }) + ' 已选' : c.name}
-            </div>
-          </div>
-        `
-        )
-        .join('')}
-    </div>
-  `;
-  container.querySelectorAll<HTMLElement>('[data-card-id]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const state = getState();
-      setState({ suiteCardId: state.suiteCardId === el.dataset.cardId ? '' : el.dataset.cardId! });
-      renderSuiteCardSelector(container);
-    });
-    const thumb = container.querySelector<HTMLElement>(`[data-card-thumb="${el.dataset.cardId}"]`);
-    if (thumb) {
-      void send<{ dataUrl: string }>('person-card-get', { id: el.dataset.cardId })
-        .then((r) => {
-          thumb.innerHTML = `<img src="${r.dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
-        })
-        .catch(() => {});
-    }
-  });
 }
 
 /** 轮询任务，完成后切图展示 */
@@ -220,7 +172,7 @@ function pollSuiteTask(taskId: string): void {
                 .map(
                   (q, i) => `
                   <div class="frame" style="aspect-ratio:1/1;">
-                    <img src="${q}" alt="四宫格 ${i + 1}">
+                    <img src="${q}" alt="四宫格 ${i + 1}" data-preview="1">
                     <span class="frame-mark">${String(i + 1).padStart(2, '0')}</span>
                     <button class="icon-btn" data-dl="${i}" title="下载单图" style="position:absolute;top:6px;right:6px;background:rgba(8,8,11,.72);z-index:2;">${iconSvg('download', { size: 14, className: 'lucide' })}</button>
                   </div>`

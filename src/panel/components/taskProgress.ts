@@ -18,11 +18,42 @@ const LABEL: Record<string, string> = {
 
 const containerId = 'task-progress-bar';
 
+/** 全局进度条的「已等待 X 秒」计时器（本地真实时钟，1 秒一跳） */
+let elapsedTicker: ReturnType<typeof setInterval> | null = null;
+
+function stopElapsedTicker(): void {
+  if (elapsedTicker) {
+    clearInterval(elapsedTicker);
+    elapsedTicker = null;
+  }
+}
+
+function startElapsedTicker(): void {
+  if (elapsedTicker) return;
+  elapsedTicker = setInterval(() => {
+    const t = getState().activeTask;
+    const el = document.getElementById(containerId);
+    const span = el?.querySelector<HTMLElement>('[data-elapsed]');
+    if (!t || !span) return;
+    if (t.status !== 'running' && t.status !== 'pending') {
+      stopElapsedTicker();
+      return;
+    }
+    const sec = Math.max(0, Math.floor((Date.now() - (t.updatedAt ?? Date.now())) / 1000));
+    span.textContent = ` · 已等待 ${sec} 秒`;
+  }, 1000);
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 /** 根据任务状态渲染 */
 export function renderTaskProgressBar(): void {
   const s = getState();
   let el = document.getElementById(containerId);
   if (!s.activeTask) {
+    stopElapsedTicker();
     el?.remove();
     return;
   }
@@ -36,6 +67,10 @@ export function renderTaskProgressBar(): void {
   const t = s.activeTask;
   const label = LABEL[t.type] ?? t.type;
   const pct = t.progress ?? 0;
+
+  if (t.status !== 'running' && t.status !== 'pending') {
+    stopElapsedTicker();
+  }
 
   if (t.status === 'done') {
     el.innerHTML = `
@@ -73,7 +108,14 @@ export function renderTaskProgressBar(): void {
   }
 
   // running / pending
+  startElapsedTicker();
   const pctText = t.status === 'running' ? `${pct}%` : '排队中…';
+  const hint =
+    t.statusText && !t.statusText.includes('已等待')
+      ? `${escapeHtml(t.statusText)}<span data-elapsed></span>`
+      : t.statusText
+        ? escapeHtml(t.statusText)
+        : 'AI 生图通常需要 1~7 分钟，请耐心等待';
   el.innerHTML = `
     <div class="tp-row">
       <span class="dot dot-blue"></span>
@@ -84,7 +126,7 @@ export function renderTaskProgressBar(): void {
       <div class="progress-fill" style="width:${Math.max(4, pct)}%"></div>
       <div class="shimmer"></div>
     </div>
-    <div class="tp-hint">AI 生图通常需要 1~7 分钟，请耐心等待</div>`;
+    <div class="tp-hint">${hint}</div>`;
 }
 
 /**
@@ -93,7 +135,7 @@ export function renderTaskProgressBar(): void {
  */
 export function renderInlineProgress(
   container: HTMLElement,
-  task: { type?: string; status: string; progress?: number; error?: string }
+  task: { type?: string; status: string; progress?: number; error?: string; statusText?: string }
 ): void {
   const label = LABEL[task.type ?? ''] ?? '生成';
   const pct = task.progress ?? 0;
@@ -135,7 +177,7 @@ export function renderInlineProgress(
         <div class="progress-fill" style="width:${Math.max(4, pct)}%"></div>
         <div class="shimmer"></div>
       </div>
-      <div class="tp-hint">AI 生图通常需要 1~7 分钟，请耐心等待</div>
+      <div class="tp-hint">${task.statusText ? escapeHtml(task.statusText) : 'AI 生图通常需要 1~7 分钟，请耐心等待'}</div>
     </div>`;
 }
 

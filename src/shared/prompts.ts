@@ -66,8 +66,9 @@ export function getAnalyzeSystemPrompt(profileId: ProfileId): string {
 
 /* ---------------- 生成功能模板 ---------------- */
 
-/** 人物卡（三视图身份模板）· 参考《提取记录》4.1 */
-export const PERSON_CARD_PROMPT = `以上传图片作为唯一身份参考，生成一张干净的三视图人脸特写图。三张图必须是同一个人，保持原图的人脸特征、脸型、骨相和发型。
+/** 人物卡（三视图身份模板）· 参考《提取记录》4.1
+ * ★ 支持多图输入：上传的 1~5 张源图都会作为参考，提示词明确「均为同一个人」，让模型综合多角度提取稳定身份 */
+export const PERSON_CARD_PROMPT = `以上传的多张图片作为唯一身份参考，这些图片均为同一个人（可能来自不同角度、场景或表情）。请综合所有图片提取该人物稳定一致的面部身份，生成一张干净的三视图人脸特写图。三张图必须是同一个人，保持原图的人脸特征、脸型、骨相和发型。
 去掉原图中的所有服装、帽子、头饰、首饰和配饰，只保留一件干净的纯白衬衫，不要图案、Logo 或装饰。
 画面包含三张并排的彩色头颈部近景，比例、大小和裁切保持一致：第一张正面直视镜头，第二张 45 度三分之二侧脸，第三张 90 度标准侧脸。三张图直接并排，只留干净白色间距，不要卡片、边框、容器或分隔框。不要添加文字。
 最终结果必须自然彩色，不要黑白。中性影棚白平衡，不偏暖不偏冷不偏粉。背景纯白、无缝、无纹理。光线柔和清晰可控，保留真实皮肤纹理和自然眼部细节，不要过度磨皮。
@@ -77,13 +78,13 @@ export const PERSON_CARD_PROMPT = `以上传图片作为唯一身份参考，生
 /**
  * 换脸（双图分工）· 参考《提取记录》4.2 设计要点
  * ★ 图1/图2 命名必须与 generate.ts 的 image 字段顺序一致：
- *   第一张 = 构图与场景参考（底图，即图1）；第二张 = 人物面部身份参考（人物卡，即图2）。
+ *   第一张 = 构图与场景参考（底图，即图1）；第二张及之后 = 人物面部身份参考（人物卡或直接上传的照片，均为同一个人）。
  *   曾因写成"以图2作为唯一基础图 / 图1只作为脸部身份来源"导致换脸方向反了（把场景脸换到人物卡上）。
  */
-export const FACESWAP_PROMPT_TEMPLATE = `图1（即 image 字段中的第一张：构图与场景参考）作为唯一基础图，负责完整场景、姿态、构图、镜头角度、头部朝向、表情、眼神、光线和色彩环境。图2（即 image 字段中的第二张：人物面部身份参考）只作为脸部身份来源。将图2的人物身份自然迁移到图1中，让最终结果看起来像图2的人原本就被拍摄在图1的场景里。
+export const FACESWAP_PROMPT_TEMPLATE = `图1（即 image 字段中的第一张：构图与场景参考）作为唯一基础图，负责完整场景、姿态、构图、镜头角度、头部朝向、表情、眼神、光线和色彩环境。第二张及之后的图片（即 image 字段中的第二张起：人物面部身份参考，均为同一个人）只作为脸部身份来源。将参考图中人物的身份自然迁移到图1中，让最终结果看起来像参考图里的人原本就被拍摄在图1的场景里。
 除脸部身份外，严格保留图1的一切：动作、身体姿态、手势、取景、透视、景深、发型方向、服装、背景和整体情绪。重点锁定图1的头部姿态和眼神：保持相同的脸部朝向、下巴角度、脖子角度、视线方向、瞳孔位置、眼睑开合和双眼细微不对称。不要让替换后的脸变得更正面、更居中、更对称或更直接看向镜头。
-高精度保留图2的人物识别度、脸型、眼睛、鼻子、嘴唇和独特面部特征，但必须完全适配图1的透视、动作、面部角度和表情结构。结果不能像贴脸，必须解剖合理、融合自然、像真实拍摄。
-严格匹配图1的肤色、白平衡、色温、曝光、受光面、阴影、鼻影、眼窝阴影、颧骨和下颌塑形、高光位置、反光强度、对比关系和整体调色。不要带入图2原本的肤色、光线、高光或阴影逻辑。让脸、脖子、耳朵和发际线都属于图1同一个光线环境。
+高精度保留面部参考图的人物识别度、脸型、眼睛、鼻子、嘴唇和独特面部特征，但必须完全适配图1的透视、动作、面部角度和表情结构。结果不能像贴脸，必须解剖合理、融合自然、像真实拍摄。
+严格匹配图1的肤色、白平衡、色温、曝光、受光面、阴影、鼻影、眼窝阴影、颧骨和下颌塑形、高光位置、反光强度、对比关系和整体调色。不要带入面部参考图原本的肤色、光线、高光或阴影逻辑。让脸、脖子、耳朵和发际线都属于图1同一个光线环境。
 保留真实皮肤纹理、自然毛孔、正确比例、准确对齐和无缝边缘。其他内容保持不变。`;
 
 /** 反推配方 + 换脸模板 */
@@ -96,7 +97,7 @@ export const REDRAW_GUIDE = `根据以下提示词生成一张全新的图片。
 
 构图参考图（= 反推来源图）作为画面布局、场景、构图、镜头角度、光线环境和色彩氛围的参考——但不是底图，最终结果应是全新画面，而非在参考图上修改。
 
-人脸参考图（= 人物卡）作为人物面部身份的来源。生成图片中的人物面部特征（脸型、五官、骨相）应与人物卡一致，但需自然适配新画面的姿态、光线和表情。
+人脸参考图（人物卡或直接上传的照片，可能为同一人的多张图）作为人物面部身份的来源。生成图片中的人物面部特征（脸型、五官、骨相）应与参考图一致，但需自然适配新画面的姿态、光线和表情。
 
 要求：高保真保留人脸参考图的人物识别度，自然融合到提示词描述的场景中。不要贴脸感，肤色和光影适配新场景而非照搬任一参考图。`;
 
@@ -109,8 +110,8 @@ export function buildRedrawPrompt(reversePrompt: string): string {
  * 图序映射：第一张（image 字段第一张）= 构图/场景/氛围底图；第二张（若提供）= 人物卡，仅作「适度面部参考」，
  * 不过度锁定面部细节；产出追求「活人感」多样套图——视角只是举例（正面/斜侧/侧面/背面…），绝不锁死，
  * 让模型结合底图自身特点与氛围自由创作。 */
-export const SUITE_PROMPT_TEMPLATE = `Create one single image that contains a natural 2x2 four-photo portrait set. The first image (the first image in the image field) is the base reference: it defines the person, pose, scene, environment, lighting, color tone, and overall mood for the photoshoot. If a second image (the second image in the image field, a person's face reference card) is provided, use it only as a light facial-identity guide: keep the same person's face across all four shots to match that card, without over-locking facial details.
-The same person must appear in all four areas. Keep identity, hairstyle, hair color, outfit, accessories, body proportions, age impression, mood, environment, lighting, color tone, image texture, and overall photographic style consistent with the base reference; facial identity consistent with the face reference card when one is provided.
+export const SUITE_PROMPT_TEMPLATE = `Create one single image that contains a natural 2x2 four-photo portrait set. The first image (the first image in the image field) is the base reference: it defines the person, pose, scene, environment, lighting, color tone, and overall mood for the photoshoot. If additional face reference images (the second and subsequent images in the image field, photos of the same person) are provided, use them only as a light facial-identity guide: keep the same person's face across all four shots to match those references, without over-locking facial details.
+The same person must appear in all four areas. Keep identity, hairstyle, hair color, outfit, accessories, body proportions, age impression, mood, environment, lighting, color tone, image texture, and overall photographic style consistent with the base reference; facial identity consistent with the face reference photos when provided.
 This should feel like one coherent portrait photoshoot, not four unrelated images.
 The image must be arranged as a natural 2x2 four-photo composition with no visible divider lines, no borders, no panel frames, and no graphic separation lines. The four areas should be visually distinct and readable as four separate portrait shots, but the overall image should remain clean and natural. Each area should look like a complete standalone portrait photo that can be cropped separately. The subject must stay inside each area and must not cross the internal horizontal or vertical center boundaries.
 All four shots must feel like real, lively moments from an actual photoshoot — natural, expressive, and a little spontaneous, with the kind of atmosphere and energy you'd see in fashionable short-video photography, never stiff, posed, or repetitive. Vary pose, body angle, gaze direction, hand gesture, composition, framing, camera distance, and camera angle naturally. Different viewing angles and body orientations can add variety — for example front view, three-quarter view, profile (side) view, or back view — but treat these only as examples, not a fixed checklist: let the mood and character of the base reference decide what fits. Do not keep any area identical to the base reference.
