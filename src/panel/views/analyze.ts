@@ -13,6 +13,7 @@ import { renderFaceReferenceSelector } from '../components/faceReferenceSelector
 import { modelBoxHtml } from '../components/modelBox';
 import { qualitySelectHtml, currentQuality, bindQualitySelect } from '../components/qualitySelector';
 import { renderInlineProgress } from '../components/taskProgress';
+import { pollTaskUntilSettled } from '../poll';
 import { iconSvg } from '../../shared/icons';
 import { blurImageDataUrl } from '../../shared/utils/image';
 import { DEFAULT_PROFILE_ID, ASPECT_OPTIONS } from '../../shared/constants';
@@ -248,7 +249,13 @@ export function renderAnalyzeView(container: HTMLElement): void {
       const resultBox = document.querySelector<HTMLElement>('#analyze-result');
       if (resultBox) renderInlineProgress(resultBox, lastTaskSnapshot);
       toast('生成任务已提交，正在生成…');
-      void pollTask(taskId);
+      void pollTaskUntilSettled(taskId, {
+        resultSelector: '#analyze-result',
+        label: '生成',
+        onSnapshot: (t) => {
+          lastTaskSnapshot = t;
+        },
+      });
     } catch (e) {
       toast((e as Error).message);
       btn.disabled = false;
@@ -263,45 +270,4 @@ export function renderAnalyzeView(container: HTMLElement): void {
     const snap = active && active.id === pollingTaskId ? active : lastTaskSnapshot;
     if (snap) renderInlineProgress(resultBox, snap);
   }
-}
-
-/** 轮询任务直到完成，并在本页 #analyze-result 内联渲染进度 */
-function pollTask(taskId: string): void {
-  let tries = 0;
-  const startedAt = Date.now();
-  const iv = setInterval(async () => {
-    tries++;
-    try {
-      const task = await send<Task>('task-status', { taskId });
-      lastTaskSnapshot = task;
-      const box = document.querySelector<HTMLElement>('#analyze-result');
-      // 前端真实时钟兜底：超过截止时间强制失败（不依赖 SW 计时器，前端永不休眠）
-      if (task.status === 'running' || task.status === 'pending') {
-        const deadline = task.deadline ?? startedAt + 420_000;
-        if (Date.now() > deadline) {
-          clearInterval(iv);
-          await send('task-force-fail', { taskId }).catch(() => {});
-          const panel = (await import('../index')).panelApi;
-          await panel.refreshTasks();
-          const failed = { ...task, status: 'failed', error: '生成超时（超过 7 分钟），请重试' } as Task;
-          lastTaskSnapshot = failed;
-          if (box) renderInlineProgress(box, failed);
-          toast('生成超时（超过 7 分钟），请重试');
-          return;
-        }
-        if (box) renderInlineProgress(box, task);
-      }
-      if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
-        clearInterval(iv);
-        if (box) renderInlineProgress(box, task);
-        // 触发结果区刷新
-        const panel = (await import('../index')).panelApi;
-        await panel.refreshTasks();
-        if (task.status === 'failed') toast('生成失败');
-      }
-    } catch {
-      /* 忽略 */
-    }
-    if (tries > 120) clearInterval(iv);
-  }, 3000);
 }

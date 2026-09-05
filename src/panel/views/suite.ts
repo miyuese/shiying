@@ -11,6 +11,7 @@ import { renderFaceReferenceSelector } from '../components/faceReferenceSelector
 import { modelBoxHtml } from '../components/modelBox';
 import { qualitySelectHtml, currentQuality, bindQualitySelect } from '../components/qualitySelector';
 import { renderInlineProgress } from '../components/taskProgress';
+import { pollTaskUntilSettled } from '../poll';
 import { iconSvg } from '../../shared/icons';
 import { splitPhotoSuiteGrid } from '../../shared/utils/image';
 import type { GeneratePayload, Task } from '../../shared/types';
@@ -99,7 +100,71 @@ export function renderSuiteView(container: HTMLElement): void {
       const box = document.querySelector<HTMLElement>('#suite-result');
       if (box) renderInlineProgress(box, lastTaskSnapshot);
       toast('拍一套任务已提交');
-      void pollSuiteTask(taskId);
+      void pollTaskUntilSettled(taskId, {
+        resultSelector: '#suite-result',
+        label: '拍一套',
+        onSnapshot: (t) => {
+          lastTaskSnapshot = t;
+        },
+        resetButton: () => {
+          const btn = document.querySelector('#btn-suite') as HTMLButtonElement | null;
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = SUITE_BTN();
+          }
+        },
+        onDone: async (task) => {
+          // 取大图 dataURL
+          const { dataUrl } = await send<{ dataUrl: string }>('image-by-key', { key: task.result!.blobKeys[0]! });
+          // 本地切 4 格
+          const quads = await splitPhotoSuiteGrid(dataUrl);
+          const suiteBox = document.querySelector<HTMLElement>('#suite-result');
+          if (suiteBox) {
+            suiteBox.innerHTML = `
+              <div class="section-head">
+                <span class="section-num">＋</span>
+                <p class="section-label" style="margin:0;">四宫格已切分 · 4 张单图</p>
+              </div>
+              <div class="contact-sheet">
+                ${quads
+                  .map(
+                    (q, i) => `
+                    <div class="frame" style="aspect-ratio:1/1;">
+                      <img src="${q}" alt="四宫格 ${i + 1}" data-preview="1">
+                      <span class="frame-mark">${String(i + 1).padStart(2, '0')}</span>
+                      <button class="icon-btn" data-dl="${i}" title="下载单图" style="position:absolute;top:6px;right:6px;background:rgba(8,8,11,.72);z-index:2;">${iconSvg('download', { size: 14, className: 'lucide' })}</button>
+                    </div>`
+                  )
+                  .join('')}
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn btn-secondary" style="flex:1;font-size:12px;" id="save-all">${iconSvg('bookmark-plus', { size: 14, className: 'lucide' })} 全部存入相册</button>
+              </div>
+            `;
+            suiteBox.querySelectorAll<HTMLElement>('[data-dl]').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                void send('download-file', {
+                  url: quads[Number(btn.dataset.dl)]!,
+                  filename: `shiyin-suite-${taskId}-${btn.dataset.dl}.jpg`,
+                });
+                toast('开始下载');
+              });
+            });
+            suiteBox.querySelector('#save-all')!.addEventListener('click', () => {
+              for (const q of quads) {
+                void send('album-add-generated', {
+                  dataUrl: q,
+                  prompt: '拍一套 · 切分单图',
+                  taskType: 'suite',
+                }).catch(() => {});
+              }
+              toast('已存入相册');
+            });
+            // 切分图也挂到任务结果上
+            toast('四宫格生成完成，已切分为 4 张');
+          }
+        },
+      });
     } catch (e) {
       toast((e as Error).message);
       btn.disabled = false;
@@ -114,123 +179,4 @@ export function renderSuiteView(container: HTMLElement): void {
     const snap = active && active.id === pollingTaskId ? active : lastTaskSnapshot;
     if (snap) renderInlineProgress(resultBox, snap);
   }
-}
-
-/** 轮询任务，完成后切图展示 */
-function pollSuiteTask(taskId: string): void {
-  let tries = 0;
-  const startedAt = Date.now();
-  const iv = setInterval(async () => {
-    tries++;
-    try {
-      const task = await send<Task>('task-status', { taskId });
-      lastTaskSnapshot = task;
-      const box = document.querySelector<HTMLElement>('#suite-result');
-      // 前端真实时钟兜底：超过截止时间强制失败（不依赖 SW 计时器，前端永不休眠）
-      if (task.status === 'running' || task.status === 'pending') {
-        const deadline = task.deadline ?? startedAt + 420_000;
-        if (Date.now() > deadline) {
-          clearInterval(iv);
-          await send('task-force-fail', { taskId }).catch(() => {});
-          const panel = (await import('../index')).panelApi;
-          await panel.refreshTasks();
-          const btn = document.querySelector('#btn-suite') as HTMLButtonElement;
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = SUITE_BTN();
-          }
-          const failed = { ...task, status: 'failed', error: '拍一套生成超时（超过 7 分钟），请重试' } as Task;
-          lastTaskSnapshot = failed;
-          if (box) renderInlineProgress(box, failed);
-          toast('拍一套生成超时（超过 7 分钟），请重试');
-          return;
-        }
-        if (box) renderInlineProgress(box, task);
-      }
-      if (task.status === 'done' && task.result?.blobKeys?.length) {
-        clearInterval(iv);
-        const panel = (await import('../index')).panelApi;
-        await panel.refreshTasks();
-        const btn = document.querySelector('#btn-suite') as HTMLButtonElement;
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = SUITE_BTN();
-        }
-        // 取大图 dataURL
-        const { dataUrl } = await send<{ dataUrl: string }>('image-by-key', { key: task.result.blobKeys[0]! });
-        // 本地切 4 格
-        const quads = await splitPhotoSuiteGrid(dataUrl);
-        const suiteBox = document.querySelector<HTMLElement>('#suite-result');
-        if (suiteBox) {
-          suiteBox.innerHTML = `
-            <div class="section-head">
-              <span class="section-num">＋</span>
-              <p class="section-label" style="margin:0;">四宫格已切分 · 4 张单图</p>
-            </div>
-            <div class="contact-sheet">
-              ${quads
-                .map(
-                  (q, i) => `
-                  <div class="frame" style="aspect-ratio:1/1;">
-                    <img src="${q}" alt="四宫格 ${i + 1}" data-preview="1">
-                    <span class="frame-mark">${String(i + 1).padStart(2, '0')}</span>
-                    <button class="icon-btn" data-dl="${i}" title="下载单图" style="position:absolute;top:6px;right:6px;background:rgba(8,8,11,.72);z-index:2;">${iconSvg('download', { size: 14, className: 'lucide' })}</button>
-                  </div>`
-                )
-                .join('')}
-            </div>
-            <div style="display:flex;gap:8px;margin-top:10px;">
-              <button class="btn btn-secondary" style="flex:1;font-size:12px;" id="save-all">${iconSvg('bookmark-plus', { size: 14, className: 'lucide' })} 全部存入相册</button>
-            </div>
-          `;
-          suiteBox.querySelectorAll<HTMLElement>('[data-dl]').forEach((btn) => {
-            btn.addEventListener('click', () => {
-              void send('download-file', {
-                url: quads[Number(btn.dataset.dl)]!,
-                filename: `shiyin-suite-${taskId}-${btn.dataset.dl}.jpg`,
-              });
-              toast('开始下载');
-            });
-          });
-          suiteBox.querySelector('#save-all')!.addEventListener('click', () => {
-            for (const q of quads) {
-              void send('album-add-generated', {
-                dataUrl: q,
-                prompt: '拍一套 · 切分单图',
-                taskType: 'suite',
-              }).catch(() => {});
-            }
-            toast('已存入相册');
-          });
-          // 切分图也挂到任务结果上
-          toast('四宫格生成完成，已切分为 4 张');
-        }
-      } else if (task.status === 'failed') {
-        clearInterval(iv);
-        const panel = (await import('../index')).panelApi;
-        await panel.refreshTasks();
-        const btn = document.querySelector('#btn-suite') as HTMLButtonElement;
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = SUITE_BTN();
-        }
-        const box2 = document.querySelector<HTMLElement>('#suite-result');
-        if (box2) renderInlineProgress(box2, task);
-        toast(`拍一套失败：${task.error ?? '未知原因'}`);
-      } else if (task.status === 'cancelled') {
-        clearInterval(iv);
-        const btn = document.querySelector('#btn-suite') as HTMLButtonElement;
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = SUITE_BTN();
-        }
-        const box2 = document.querySelector<HTMLElement>('#suite-result');
-        if (box2) renderInlineProgress(box2, task);
-        toast('拍一套已取消');
-      }
-    } catch {
-      /* 忽略 */
-    }
-    if (tries > 120) clearInterval(iv);
-  }, 3000);
 }

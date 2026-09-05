@@ -88,16 +88,18 @@ export function renderTaskProgressBar(): void {
   }
 
   if (t.status === 'failed') {
+    // 失败不自动消失：错误原因需要时间阅读，由用户手动关闭（下一次任务提交也会自然覆盖）
     el.innerHTML = `
       <div class="tp-row" style="align-items:flex-start;">
         ${iconSvg('alert-triangle', { size: 14, className: 'lucide err' })}
         <span class="tp-title err">${label}失败</span>
-        <span class="tp-hint auto" style="opacity:.85;">${t.error ?? '未知错误'}</span>
+        <span class="tp-hint auto" style="opacity:.85;flex:1;">${t.error ? escapeHtml(t.error) : '未知错误'}</span>
+        <button class="icon-btn" data-tp-close title="关闭">${iconSvg('x', { size: 13, className: 'lucide' })}</button>
       </div>`;
-    setTimeout(() => {
+    el.querySelector<HTMLElement>('[data-tp-close]')?.addEventListener('click', () => {
       const cur = getState();
-      if (cur.activeTask?.id === t.id && cur.activeTask?.status === 'failed') setState({ activeTask: null });
-    }, 6000);
+      if (cur.activeTask?.id === t.id) setState({ activeTask: null });
+    });
     return;
   }
 

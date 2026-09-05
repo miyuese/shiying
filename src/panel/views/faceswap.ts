@@ -11,6 +11,7 @@ import { renderFaceReferenceSelector } from '../components/faceReferenceSelector
 import { modelBoxHtml } from '../components/modelBox';
 import { qualitySelectHtml, currentQuality, bindQualitySelect } from '../components/qualitySelector';
 import { renderInlineProgress } from '../components/taskProgress';
+import { pollTaskUntilSettled } from '../poll';
 import { iconSvg } from '../../shared/icons';
 import type { GeneratePayload, Task } from '../../shared/types';
 
@@ -109,7 +110,49 @@ export function renderFaceswapView(container: HTMLElement): void {
       const box = document.querySelector<HTMLElement>('#swap-result');
       if (box) renderInlineProgress(box, lastTaskSnapshot);
       toast('换脸任务已提交');
-      void pollSwapTask(taskId);
+      void pollTaskUntilSettled(taskId, {
+        resultSelector: '#swap-result',
+        label: '换脸',
+        onSnapshot: (t) => {
+          lastTaskSnapshot = t;
+        },
+        resetButton: () => {
+          const btn = document.querySelector('#btn-swap') as HTMLButtonElement | null;
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = SWAP_BTN();
+          }
+        },
+        onDone: async (task) => {
+          // 展示结果图
+          const { dataUrl } = await send<{ dataUrl: string }>('image-by-key', { key: task.result!.blobKeys[0]! });
+          const box = document.querySelector<HTMLElement>('#swap-result');
+          if (box) {
+            box.innerHTML = `
+              <div class="section-head">
+                <span class="section-num">＋</span>
+                <p class="section-label" style="margin:0;">换脸结果</p>
+              </div>
+              <div class="frame">
+                <img src="${dataUrl}" alt="换脸结果" data-preview="1">
+                <span class="frame-mark">Face Swap</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn btn-secondary" style="flex:1;font-size:12px;" id="swap-download">${iconSvg('download', { size: 14, className: 'lucide' })} 下载</button>
+                <button class="btn btn-secondary" style="flex:1;font-size:12px;" id="swap-save">${iconSvg('bookmark-plus', { size: 14, className: 'lucide' })} 存入相册</button>
+              </div>
+            `;
+            box.querySelector('#swap-download')!.addEventListener('click', () => {
+              void send('download-file', { url: dataUrl, filename: `shiyin-faceswap-${taskId}.jpg` });
+              toast('开始下载');
+            });
+            box.querySelector('#swap-save')!.addEventListener('click', () => {
+              void send('album-add-generated', { dataUrl, prompt: '换脸结果', taskType: 'faceswap' }).catch(() => {});
+              toast('已存入相册');
+            });
+          }
+        },
+      });
     } catch (e) {
       toast((e as Error).message);
       btn.disabled = false;
@@ -124,90 +167,4 @@ export function renderFaceswapView(container: HTMLElement): void {
     const snap = active && active.id === pollingTaskId ? active : lastTaskSnapshot;
     if (snap) renderInlineProgress(resultBox, snap);
   }
-}
-
-function pollSwapTask(taskId: string): void {
-  let tries = 0;
-  const startedAt = Date.now();
-  const iv = setInterval(async () => {
-    tries++;
-    try {
-      const task = await send<Task>('task-status', { taskId });
-      lastTaskSnapshot = task;
-      const box = document.querySelector<HTMLElement>('#swap-result');
-      // 前端真实时钟兜底：超过截止时间强制失败（不依赖 SW 计时器，前端永不休眠）
-      if (task.status === 'running' || task.status === 'pending') {
-        const deadline = task.deadline ?? startedAt + 420_000;
-        if (Date.now() > deadline) {
-          clearInterval(iv);
-          await send('task-force-fail', { taskId }).catch(() => {});
-          const panel = (await import('../index')).panelApi;
-          await panel.refreshTasks();
-          const btn = document.querySelector('#btn-swap') as HTMLButtonElement;
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = SWAP_BTN();
-          }
-          const failed = { ...task, status: 'failed', error: '换脸生成超时（超过 7 分钟），请重试' } as Task;
-          lastTaskSnapshot = failed;
-          if (box) renderInlineProgress(box, failed);
-          toast('换脸生成超时（超过 7 分钟），请重试');
-          return;
-        }
-        if (box) renderInlineProgress(box, task);
-      }
-      if (task.status === 'done' && task.result?.blobKeys?.length) {
-        clearInterval(iv);
-        const panel = (await import('../index')).panelApi;
-        await panel.refreshTasks();
-        const btn = document.querySelector('#btn-swap') as HTMLButtonElement;
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = SWAP_BTN();
-        }
-        // 展示结果图
-        const { dataUrl } = await send<{ dataUrl: string }>('image-by-key', { key: task.result.blobKeys[0]! });
-        const box = document.querySelector<HTMLElement>('#swap-result');
-        if (box) {
-          box.innerHTML = `
-            <div class="section-head">
-              <span class="section-num">＋</span>
-              <p class="section-label" style="margin:0;">换脸结果</p>
-            </div>
-            <div class="frame">
-              <img src="${dataUrl}" alt="换脸结果" data-preview="1">
-              <span class="frame-mark">Face Swap</span>
-            </div>
-            <div style="display:flex;gap:8px;margin-top:10px;">
-              <button class="btn btn-secondary" style="flex:1;font-size:12px;" id="swap-download">${iconSvg('download', { size: 14, className: 'lucide' })} 下载</button>
-              <button class="btn btn-secondary" style="flex:1;font-size:12px;" id="swap-save">${iconSvg('bookmark-plus', { size: 14, className: 'lucide' })} 存入相册</button>
-            </div>
-          `;
-          box.querySelector('#swap-download')!.addEventListener('click', () => {
-            void send('download-file', { url: dataUrl, filename: `shiyin-faceswap-${taskId}.jpg` });
-            toast('开始下载');
-          });
-          box.querySelector('#swap-save')!.addEventListener('click', () => {
-            void send('album-add-generated', { dataUrl, prompt: '换脸结果', taskType: 'faceswap' }).catch(() => {});
-            toast('已存入相册');
-          });
-        }
-      } else if (task.status === 'failed') {
-        clearInterval(iv);
-        const panel = (await import('../index')).panelApi;
-        await panel.refreshTasks();
-        const box2 = document.querySelector<HTMLElement>('#swap-result');
-        if (box2) renderInlineProgress(box2, task);
-        toast(`换脸失败：${task.error ?? '未知原因'}`);
-      } else if (task.status === 'cancelled') {
-        clearInterval(iv);
-        const box2 = document.querySelector<HTMLElement>('#swap-result');
-        if (box2) renderInlineProgress(box2, task);
-        toast('换脸已取消');
-      }
-    } catch {
-      /* 忽略 */
-    }
-    if (tries > 120) clearInterval(iv);
-  }, 3000);
 }
