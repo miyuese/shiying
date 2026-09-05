@@ -4,7 +4,7 @@
  */
 
 import type { Task, TaskStatus, TaskType } from '../shared/types';
-import { TASK_MAX_KEEP } from '../shared/constants';
+import { TASK_MAX_KEEP, TASK_EXEC_TIMEOUT, TASK_STALE_MS } from '../shared/constants';
 import { storage, KEYS } from './store/storage';
 import { genId } from '../shared/utils/image';
 import { putImage, deleteImages, getImage, hasImage } from './store/db';
@@ -199,9 +199,6 @@ export async function hasActiveTaskOfType(type: TaskType): Promise<boolean> {
   return tasks.some((t) => t.type === type && (t.status === 'pending' || t.status === 'running'));
 }
 
-/** 任务硬超时（与 enqueue 的 TASK_EXEC_TIMEOUT 一致） */
-const TASK_STALE_MS = 430_000;
-
 /**
  * 看门狗：扫描 running/pending 任务，超过硬超时则强制标 failed，并真正中止底层请求。
  * 优先用任务的 deadline 字段（真实时钟），无 deadline 时用 updatedAt 兜底。
@@ -239,8 +236,6 @@ export async function watchdogStaleTasks(): Promise<{ stuck: number }> {
  * SW 休眠会冻结 setTimeout/fetch，导致任务永不结束、串行队列被堵死。
  * 这里给每个任务加硬超时，超时强制 reject，队列继续前进。
  */
-const TASK_EXEC_TIMEOUT = 420_000; // 420s（7 分钟）总预算：服务商慢时 5~6 分钟能出图，给足余量；超时后 runGenerate 自动重试 1 次
-
 let running: Promise<void> = Promise.resolve();
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {

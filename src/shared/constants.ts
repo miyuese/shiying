@@ -40,6 +40,11 @@ export const DOWNLOAD_TIMEOUT = 90000;
 export const TEST_TIMEOUT = 10000;
 export const POLL_INTERVAL = 3000;
 
+/** 任务硬超时（7 分钟总预算）：服务商慢时 5~6 分钟能出图，给足余量；超时后 runGenerate 自动重试 1 次 */
+export const TASK_EXEC_TIMEOUT = 420_000;
+/** 看门狗判定任务僵死的兜底阈值：任务无 deadline 字段时按 updatedAt 计算，略大于执行超时 */
+export const TASK_STALE_MS = TASK_EXEC_TIMEOUT + 10_000;
+
 /** 任务保留上限 */
 export const TASK_MAX_KEEP = 50;
 
