@@ -123,6 +123,11 @@ function renderPhotosMode(container: HTMLElement, _suiteMode: boolean): void {
         }>${iconSvg('plus', { size: 12, className: 'lucide' })} 添加照片</button>
         <button class="btn btn-secondary" id="save-to-card" style="font-size:11px;padding:5px 10px;">${iconSvg('user-round', { size: 12, className: 'lucide' })} 存成人物卡</button>
       </div>
+      ${
+        photos.length > 1
+          ? '<p class="micro" style="margin:8px 0 0;">提示：多张面部参考需服务商支持多图 edits（第一张=构图、第二张起=人脸）。若不支持，模型可能只读取第一张。</p>'
+          : ''
+      }
     </div>
   `;
 
