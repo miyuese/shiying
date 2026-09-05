@@ -37,7 +37,8 @@ function manifestPlugin(): Plugin {
             run_at: 'document_idle',
           },
         ],
-        permissions: ['storage', 'tabs', 'activeTab', 'sidePanel', 'downloads', 'scripting', 'alarms', 'unlimitedStorage'],
+        // tabs 权限已移除：只用到 chrome.tabs.query，url 可见性由 host_permissions 提供
+        permissions: ['storage', 'activeTab', 'sidePanel', 'downloads', 'scripting', 'alarms', 'unlimitedStorage'],
         host_permissions: ['<all_urls>'],
         icons: {
           '16': 'icons/icon16.png',

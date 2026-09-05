@@ -9,7 +9,16 @@
  * 自包含约束（重要）：manifest 声明的 content script 不是 ES module，不支持顶层 import，
  * 顶层 import 会让脚本整份加载失败（SyntaxError: Cannot use import statement outside a module）。
  * 因此本文件不 import 任何 shared 模块，图标数据直接内联（渲染与 shared/icons.ts 保持一致）。
+ *
+ * 幂等守卫：manifest 自动注入 + popup 每次打开主动注入会重复执行本脚本。
+ * 经典脚本重复执行时顶层 const 会重声明报错，所以整份脚本包在 IIFE 里，
+ * 用 window 标记保证监听器只注册一次。
  */
+
+(() => {
+  const w = window as unknown as { __shiyinContentInjected?: boolean };
+  if (w.__shiyinContentInjected) return;
+  w.__shiyinContentInjected = true;
 
 /** 本地图标注册表（Lucide iconNode 数据，仅悬浮层用到的 3 个） */
 const CONTENT_ICONS: Record<string, Array<[string, Record<string, string>]>> = {
@@ -389,3 +398,4 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 init();
+})();

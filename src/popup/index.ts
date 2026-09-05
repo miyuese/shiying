@@ -128,7 +128,7 @@ async function openSidePanel(): Promise<void> {
 }
 
 async function openPanelWithImage(tab: string): Promise<void> {
-  await storePendingImage();
+  // 调用方（快捷按钮）已先 storePendingImage，这里不再重复抓图
   await openSidePanel();
   window.close();
 }
