@@ -69,7 +69,7 @@ async function init(): Promise<void> {
   const refreshTasks = async () => {
     const box = $('task-log');
     try {
-      const tasks = await send<{ id: string; type: string; status: string; error?: string; createdAt: number; progress?: number }[]>('task-list', { limit: 10 });
+      const tasks = await send<{ id: string; type: string; status: string; error?: string; statusText?: string; createdAt: number; progress?: number }[]>('task-list', { limit: 10 });
       if (tasks.length === 0) {
         setHtml(box, '<p style="color:var(--ink-3);">暂无任务</p>');
         return;
@@ -84,6 +84,7 @@ async function init(): Promise<void> {
                 <span style="color:${statusColor[t.status] ?? 'var(--ink-2)'};font-weight:600;">${label[t.type] ?? t.type} · ${t.status}${t.progress ? ' ' + t.progress + '%' : ''}</span>
               </div>
               ${t.error ? `<div style="color:var(--red);white-space:pre-wrap;">${escapeHtml(t.error)}</div>` : ''}
+              ${t.statusText ? `<div style="color:var(--ink-2);">阶段：${escapeHtml(t.statusText)}</div>` : ''}
               <div style="color:var(--ink-3);font-size:9px;">${t.id} · ${new Date(t.createdAt).toLocaleString()}</div>
             </div>`
         )
@@ -93,6 +94,30 @@ async function init(): Promise<void> {
     }
   };
   $('btn-refresh-tasks').addEventListener('click', () => void refreshTasks());
+  $('btn-unlock-tasks').addEventListener('click', async () => {
+    if (!confirm('把所有卡在「生成中」的任务直接判为失败？\n用于服务商已失败但一直不返回、导致人物卡提示 BUSY 的情况。')) return;
+    try {
+      const res = await send<{ unlocked: number }>('task-force-unlock');
+      toast(res.unlocked > 0 ? `已解锁 ${res.unlocked} 条卡死任务` : '没有卡死的任务');
+      await refreshTasks();
+    } catch (e) {
+      toast((e as Error).message);
+    }
+  });
+  $('btn-clear-tasks').addEventListener('click', async () => {
+    if (!confirm('清除全部历史任务？未存入相册的成图会一并删除，此操作不可恢复。')) return;
+    try {
+      const res = await send<{ cleared: number; kept: number; blobs: number }>('tasks-clear');
+      toast(
+        res.cleared > 0
+          ? `已清除 ${res.cleared} 条任务${res.kept ? `，${res.kept} 条进行中已保留` : ''}`
+          : '没有可清除的任务'
+      );
+      await refreshTasks();
+    } catch (e) {
+      toast((e as Error).message);
+    }
+  });
   void refreshTasks();
 
   // 错误日志查看器
@@ -119,6 +144,16 @@ async function init(): Promise<void> {
     }
   };
   $('btn-refresh-errors').addEventListener('click', () => void refreshErrors());
+  $('btn-clear-errors').addEventListener('click', async () => {
+    if (!confirm('清除全部错误日志？')) return;
+    try {
+      await send('errors-clear');
+      toast('错误日志已清除');
+      await refreshErrors();
+    } catch (e) {
+      toast((e as Error).message);
+    }
+  });
   void refreshErrors();
 
   // 保存

@@ -7,7 +7,7 @@ import type { Task, TaskStatus, TaskType } from '../shared/types';
 import { TASK_MAX_KEEP, TASK_EXEC_TIMEOUT, TASK_STALE_MS } from '../shared/constants';
 import { storage, KEYS } from './store/storage';
 import { genId } from '../shared/utils/image';
-import { putImage, deleteImages, getImage, hasImage } from './store/db';
+import { putImage, deleteImages, getImage, hasImage, listImageKeys } from './store/db';
 
 type Listener = (task: Task) => void;
 const listeners = new Set<Listener>();
@@ -162,6 +162,45 @@ export async function listTasks(limit = 10): Promise<Task[]> {
 }
 
 /**
+ * 清除历史任务（设置页「清除」按钮）
+ * - 只清终态（done/failed/cancelled）：running/pending 仍被面板轮询，清掉会让轮询拿到 undefined 而报错
+ * - 成图 gen:{taskId}:* 与再生成输入图 regen-src/regen-face 一并回收
+ * - 相册里存过的成图是独立 blob 拷贝（album-add-generated 重新入库），不受影响
+ *   → 等价于「没入相册的成图跟着删，入了相册的留在相册」
+ */
+export async function clearTasks(): Promise<{ cleared: number; kept: number; blobs: number }> {
+  const tasks = await loadTasks();
+  const finished = tasks.filter((t) => t.status !== 'pending' && t.status !== 'running');
+  const kept = tasks.length - finished.length;
+  if (finished.length === 0) return { cleared: 0, kept, blobs: 0 };
+
+  // 1) 先移除任务记录：即使后续 blob 回收失败，也不留下指向已删图的空壳任务
+  await storage.set(
+    KEYS.tasks,
+    tasks.filter((t) => t.status === 'pending' || t.status === 'running')
+  );
+
+  // 2) 按 taskId 精确回收 blob（不能用 gen: 前缀通配，否则会连相册一起清空）
+  const keys = new Set<string>();
+  for (const t of finished) {
+    const own = `gen:${t.id}:`;
+    for (const k of await listImageKeys(own).catch(() => [] as string[])) if (k.startsWith(own)) keys.add(k);
+    for (const k of t.result?.blobKeys ?? []) if (typeof k === 'string' && k.startsWith(own)) keys.add(k);
+    for (const k of t.result?.splitBlobKeys ?? []) if (typeof k === 'string' && k.startsWith(own)) keys.add(k);
+    const inputs = (t.inputs ?? {}) as { sourceBlobKey?: string; faceBlobKey?: string; faceBlobKeys?: string[] };
+    if (typeof inputs.sourceBlobKey === 'string' && inputs.sourceBlobKey.startsWith('regen-')) keys.add(inputs.sourceBlobKey);
+    if (typeof inputs.faceBlobKey === 'string' && inputs.faceBlobKey.startsWith('regen-')) keys.add(inputs.faceBlobKey);
+    for (const k of inputs.faceBlobKeys ?? []) if (typeof k === 'string' && k.startsWith('regen-')) keys.add(k);
+  }
+  if (keys.size > 0) await deleteImages([...keys]).catch(() => {});
+
+  // 3) 广播一次，让已打开的面板/弹窗重新拉取（此时列表已空）
+  const last = finished[finished.length - 1];
+  if (last) emit(last);
+  return { cleared: finished.length, kept, blobs: keys.size };
+}
+
+/**
  * 自愈：旧版本 sanitize 的"深度截断"把 done 任务的 result.blobKeys 存成了 [null]，
  * 导致结果区按 null 取图永远 image-not-found、灰框。
  * 这里按图库实际存在的 gen:{id}:{i} 键重建 blobKeys。
@@ -193,10 +232,44 @@ async function healTaskBlobKeys(t: Task): Promise<Task> {
 /**
  * 是否已有进行中的该类型任务（人物卡锁：同一时间只允许一张人物卡在生成）。
  * 生成请求已发出后取消没有意义，产品决策：不做取消，只做互斥锁。
+ * ★ 已过 deadline 的任务视为「已死」：看门狗最多每分钟才扫一次，
+ *   不能让一条卡死记录永久挡住新任务（否则只能等 7 分钟或重载扩展）。
  */
 export async function hasActiveTaskOfType(type: TaskType): Promise<boolean> {
+  const now = Date.now();
   const tasks = await loadTasks();
-  return tasks.some((t) => t.type === type && (t.status === 'pending' || t.status === 'running'));
+  return tasks.some((t) => {
+    if (t.type !== type) return false;
+    if (t.status !== 'pending' && t.status !== 'running') return false;
+    const expired =
+      typeof t.deadline === 'number'
+        ? t.deadline < now
+        : now - t.updatedAt > TASK_STALE_MS;
+    return !expired;
+  });
+}
+
+/**
+ * 强制解锁：把所有 running/pending 任务标为失败并中止底层请求。
+ * 用于「服务商受理后不回话」这类卡死场景——看门狗要等 7 分钟，这里给用户一个立刻恢复的出口。
+ * 传 type 只解锁该类型，不传则解锁全部。
+ */
+export async function unlockStuckTasks(type?: TaskType): Promise<{ unlocked: number }> {
+  const tasks = await loadTasks();
+  const now = Date.now();
+  let unlocked = 0;
+  for (const t of tasks) {
+    if (t.status !== 'pending' && t.status !== 'running') continue;
+    if (type && t.type !== type) continue;
+    abortTask(t.id);
+    t.status = 'failed';
+    t.error = '已手动解锁（任务被判定卡死）';
+    t.updatedAt = now;
+    unlocked++;
+    emit(t);
+  }
+  if (unlocked > 0) await persist(tasks);
+  return { unlocked };
 }
 
 /**

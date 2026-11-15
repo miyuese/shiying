@@ -7,6 +7,7 @@ import type {
   MsgEnvelope,
   MsgResponse,
   Settings,
+  TaskType,
   AnalyzePayload,
   GeneratePayload,
   CollectPayload,
@@ -15,6 +16,7 @@ import type {
   PersonCardCreatePayload,
   PersonCardDeletePayload,
   PersonCardSetDefaultPayload,
+  PersonCardRenamePayload,
   TestConnPayload,
   ImageFromUrlPayload,
   ImageFromAlbumPayload,
@@ -40,6 +42,8 @@ import {
   unregisterTaskAbort,
   refreshDeadline,
   hasActiveTaskOfType,
+  clearTasks,
+  unlockStuckTasks,
 } from './tasks';
 import { putImage, deleteImages, getImage, listImageKeys } from './store/db';
 import { genId, compressImage } from '../shared/utils/image';
@@ -51,7 +55,8 @@ import { listErrors, clearErrors, logError } from './store/errorLog';
 /** 内部异常 → 中文用户文案 */
 function toError(err: unknown): string {
   const e = err as { code?: string; message?: string };
-  const code = e.code ?? '';
+  // 有些错误是 new Error('PERSON_CARD_BUSY') 这种只带 message 的，按 message 也能命中映射表
+  const code = e.code ?? e.message ?? '';
   const map: Record<string, string> = {
     AUTH_INVALID: 'API Key 无效，请到设置检查',
     AUTH_FORBIDDEN: '无权限，请检查 Key 与模型权限',
@@ -169,6 +174,12 @@ async function handle(msg: MsgEnvelope): Promise<unknown> {
       await personCards.clearCardGenError(id);
       return { id };
     }
+    case 'person-card-rename': {
+      const { id, name } = msg.payload as PersonCardRenamePayload;
+      const card = await personCards.renamePersonCard(id, name);
+      if (!card) throw new Error('image-not-found');
+      return { card };
+    }
 
     /* -------- 反推 -------- */
     case 'analyze-image': {
@@ -198,6 +209,13 @@ async function handle(msg: MsgEnvelope): Promise<unknown> {
     case 'task-list': {
       const { limit } = (msg.payload ?? {}) as { limit?: number };
       return listTasks(limit);
+    }
+    case 'tasks-clear':
+      return clearTasks();
+    case 'task-force-unlock': {
+      // 强制解锁卡死的进行中任务（服务商受理后不回话时用，不必等 7 分钟看门狗）
+      const { type } = (msg.payload ?? {}) as { type?: TaskType };
+      return unlockStuckTasks(type);
     }
     case 'task-force-fail': {
       // 前端轮询发现任务超时（真实时钟）→ 强制标记失败并中止底层请求
@@ -501,30 +519,79 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
     registerTaskAbort(taskId, controller);
     try {
       const result = await enqueue(async () => {
-        await updateTask(taskId, { progress: 20 });
-        const gen = await generateImage(
-          {
-            prompt: p.prompt,
-            intent: p.intent,
-            sourceRef: p.sourceRef, // 兼容旧调用（dataURL）
-            sourceBlobs, // 原图直传（优先；人物卡场景为多张）
-            faceRef: p.faceRef,
-            faceBlobs, // 人脸参考（人物卡 1 张 / 直接上传照片 1~2 张）
-            aspectRatio: p.aspectRatio,
-            quality: p.quality,
-          },
-          controller.signal, // 看门狗/强制失败可中止请求
-          (info) => {
-            // 进度细分：把 20%→80% 拆成 提交/等待/接收/下载 各阶段，界面不再像卡死
-            void updateTask(taskId, { progress: info.percent, statusText: info.statusText }).catch(() => {});
+        /**
+         * 拍一套：按配比拆成「人像批 + 配图批」串行请求，结果合并进同一个任务。
+         * 单批（4 人像 / 4 配图）仍只发一次请求，成本与改造前一致；
+         * 混合档（如 2+2）发两次，配图批只带底图，不带人脸参考。
+         */
+        const batches: { kind: 'portrait' | 'scene'; count: number }[] = [];
+        if (p.intent === 'suite') {
+          const mix = p.suiteMix;
+          if (mix && (mix.portrait > 0 || mix.scene > 0)) {
+            if (mix.portrait > 0) batches.push({ kind: 'portrait', count: mix.portrait });
+            if (mix.scene > 0) batches.push({ kind: 'scene', count: mix.scene });
+          } else {
+            batches.push({ kind: 'portrait', count: 4 });
           }
-        );
+        }
+        const total = Math.max(1, batches.length);
+        const hiQuality = p.quality === '2K' || p.quality === '4K';
+        const merged: string[] = [];
+        let lastGen: { images: string[]; model: string } | null = null;
+
+        for (let bi = 0; bi < total; bi++) {
+          const b = batches[bi] ?? null;
+          const from = 20 + (60 / total) * bi;
+          const to = 20 + (60 / total) * (bi + 1);
+          await updateTask(taskId, {
+            progress: Math.round(from),
+            ...(b ? { statusText: `${b.kind === 'portrait' ? '生成人像' : '生成配图'}（${bi + 1}/${total}）…` } : {}),
+          });
+          // 本批张数决定画幅：1 张 3:4 直出 / 2 张 3:2（左右各一格 3:4）/ 3~4 张 1:1 四宫格
+          const batchAspect = b ? (b.count <= 1 ? '3:4' : b.count === 2 ? '3:2' : '1:1') : p.aspectRatio;
+          const batchSize =
+            b && !hiQuality
+              ? b.count <= 1
+                ? '768x1024'
+                : b.count === 2
+                  ? '1536x1024'
+                  : '1024x1024'
+              : undefined;
+          const gen = await generateImage(
+            {
+              prompt: p.prompt,
+              intent: p.intent,
+              sourceRef: p.sourceRef, // 兼容旧调用（dataURL）
+              sourceBlobs, // 原图直传（优先；人物卡场景为多张）
+              // 配图批只带底图：带了人脸参考，静物格里会冒出那个人
+              faceRef: b?.kind === 'scene' ? undefined : p.faceRef,
+              faceBlobs: b?.kind === 'scene' ? [] : faceBlobs,
+              aspectRatio: batchAspect,
+              quality: p.quality,
+              suiteBatch: b?.kind,
+              suiteCount: b?.count,
+              sizeOverride: batchSize,
+            },
+            controller.signal, // 看门狗/强制失败可中止请求
+            (info) => {
+              // 进度细分：把本批的 from→to 区间映射出来，并标出「人像 1/2」这样的批次前缀
+              const mapped = Math.round(from + ((to - from) * Math.min(100, Math.max(0, info.percent))) / 100);
+              const prefix = b ? `${b.kind === 'portrait' ? '人像' : '配图'} ${bi + 1}/${total} · ` : '';
+              void updateTask(taskId, {
+                progress: mapped,
+                statusText: `${prefix}${info.statusText ?? ''}`,
+              }).catch(() => {});
+            }
+          );
+          merged.push(...gen.images);
+          lastGen = gen;
+        }
         await updateTask(taskId, { progress: 80, statusText: '保存结果…' });
 
-        // 结果 blob 入库
+        // 结果 blob 入库（混合档是两张拼图，前端再按张数切分）
         const blobKeys: string[] = [];
-        for (let i = 0; i < gen.images.length; i++) {
-          const src = gen.images[i]!;
+        for (let i = 0; i < merged.length; i++) {
+          const src = merged[i]!;
           const blob = await toBlob(src);
           const key = `gen:${taskId}:${i}`;
           await putImage(key, blob);
@@ -553,7 +620,7 @@ async function runGenerate(taskId: string, p: GeneratePayload) {
         }
 
         await updateTask(taskId, { result: { blobKeys }, progress: 100, status: 'done', statusText: '完成' });
-        return gen;
+        return lastGen ?? { images: merged, model: '' };
       });
 
       // 成功

@@ -138,6 +138,21 @@ export async function setDefaultPersonCard(id: string): Promise<void> {
   await saveSettings({ ...settings, defaultPersonCardId: id });
 }
 
+/**
+ * 重命名人物卡（用户自定义名称）
+ * 空名视为取消，保留原名；返回最新卡片供 UI 即时更新
+ */
+export async function renamePersonCard(id: string, name: string): Promise<PersonCard | undefined> {
+  const all = await getAll();
+  const card = all.find((c) => c.id === id);
+  if (!card) return undefined;
+  const next = name.trim();
+  if (!next) return card;
+  card.name = next;
+  await saveAll(all);
+  return card;
+}
+
 /** 人物卡图 dataURL（取最后一张 = 三视图卡，否则第一张源图） */
 export async function personCardDataUrl(card: PersonCard): Promise<string> {
   // 优先展示生成的三视图卡（blobKeys 最后一张），否则第一张源图

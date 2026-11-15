@@ -169,16 +169,12 @@ async function refreshTasks(): Promise<void> {
                 : 'dot-amber';
         const statusText =
           t.status === 'done' ? '完成' : t.status === 'failed' ? '失败' : t.status === 'running' ? `生成中 ${t.progress ?? ''}%` : t.status === 'cancelled' ? '已取消' : '排队中';
-        const errorLine = t.status === 'failed' && t.error
-          ? `<p style="font-size:10px;color:var(--red);margin:4px 0 0;line-height:1.4;">${escapeHtml(t.error)}</p>`
-          : '';
         return `
           <div class="task-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
             <div style="display:flex;align-items:center;gap:8px;width:100%;">
               <span class="dot ${dot}"></span>
               <span style="font-size:11px;color:var(--text-2);flex:1;">${label} · ${statusText}</span>
             </div>
-            ${errorLine}
           </div>`;
       })
       .join('')
@@ -186,10 +182,6 @@ async function refreshTasks(): Promise<void> {
   } catch {
     /* 忽略 */
   }
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 init();

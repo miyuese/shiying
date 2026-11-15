@@ -68,29 +68,34 @@ export async function compressImage(
  * 按中心十字把一张 2×2 四宫格大图切成 4 张。
  * 返回 [左上, 右上, 左下, 右下] 的 dataURL 数组。
  */
-export async function splitPhotoSuiteGrid(src: string): Promise<string[]> {
+/**
+ * 把一张拼图按 cols×rows 均分切出小图（行优先：先第一排从左到右）。
+ * 拍一套用：1 张不切、2 张左右切（cols=2, rows=1）、4 张 2×2 切。
+ */
+export async function splitGrid(src: string, cols = 2, rows = 2): Promise<string[]> {
   const img = await loadImage(src);
   const w = img.width;
   const h = img.height;
-  const hw = Math.floor(w / 2);
-  const hh = Math.floor(h / 2);
-  const quadrants: [number, number][] = [
-    [0, 0],
-    [hw, 0],
-    [0, hh],
-    [hw, hh],
-  ];
+  const cw = Math.floor(w / Math.max(1, cols));
+  const ch = Math.floor(h / Math.max(1, rows));
   const results: string[] = [];
-  for (const [sx, sy] of quadrants) {
-    const canvas = document.createElement('canvas');
-    canvas.width = hw;
-    canvas.height = hh;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('canvas-unavailable');
-    ctx.drawImage(img, sx, sy, hw, hh, 0, 0, hw, hh);
-    results.push(canvas.toDataURL('image/jpeg', 0.92));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('canvas-unavailable');
+      ctx.drawImage(img, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
+      results.push(canvas.toDataURL('image/jpeg', 0.92));
+    }
   }
   return results;
+}
+
+/** 拍一套四宫格：2×2 均分（保留旧名，旧调用点不用改） */
+export async function splitPhotoSuiteGrid(src: string): Promise<string[]> {
+  return splitGrid(src, 2, 2);
 }
 
 /**

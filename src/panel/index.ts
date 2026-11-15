@@ -12,7 +12,7 @@ import { renderFaceswapView } from './views/faceswap';
 import { renderSuiteView } from './views/suite';
 import { renderAlbumView } from './views/album';
 import { renderPersonCardView } from './views/personCard';
-import { renderResultBar } from './components/resultBar';
+import { renderResultDrawer } from './components/resultDrawer';
 import { initImagePreview } from './components/imagePreview';
 import { configStatus } from '../shared/configStatus';
 import type { Settings, Task, PersonCard } from '../shared/types';
@@ -164,7 +164,7 @@ function renderShell(): void {
     ${banner}
     <div class="tab-rail">${tabsHtml}</div>
     <div class="${viewClass}" id="view"></div>
-    <div class="result-bar" id="result-bar"></div>
+    <div class="result-dock" id="result-dock"></div>
   `
   );
 
@@ -189,9 +189,9 @@ function renderShell(): void {
   }
   if (prevScroll > 0) view.scrollTop = prevScroll;
 
-  // 结果区
-  const resultBar = document.getElementById('result-bar')!;
-  renderResultBar(resultBar);
+  // 结果抽屉（折叠条 + 展开区）
+  const resultDock = document.getElementById('result-dock')!;
+  renderResultDrawer(resultDock);
 
   // Tab 切换
   app.querySelectorAll<HTMLElement>('.tab-item').forEach((el) => {

@@ -6,6 +6,9 @@ import { describe, it, expect } from 'vitest';
 import {
   getAnalyzeSystemPrompt,
   buildGeneratePrompt,
+  buildSuitePortraitPrompt,
+  buildSuiteScenePrompt,
+  suiteLayout,
   PERSON_CARD_PROMPT,
   SUITE_PROMPT_TEMPLATE,
   FACESWAP_PROMPT_TEMPLATE,
@@ -92,5 +95,44 @@ describe('生成功能模板', () => {
     expect(faceswap).toContain('第二张及之后的图片');
     const suite = buildGeneratePrompt('suite', 'x');
     expect(suite).toBe(SUITE_PROMPT_TEMPLATE);
+  });
+});
+
+describe('拍一套 · 人像批 / 配图批', () => {
+  it('排布按张数变化：1 张直出、2 张左右并排、3~4 张四宫格', () => {
+    expect(suiteLayout(1)).toBe('single');
+    expect(suiteLayout(2)).toBe('pair');
+    expect(suiteLayout(3)).toBe('grid');
+    expect(suiteLayout(4)).toBe('grid');
+    expect(buildSuitePortraitPrompt(1)).toContain('one single vertical photograph');
+    expect(buildSuitePortraitPrompt(2)).toContain('3:4 vertical frame');
+    expect(buildSuitePortraitPrompt(4)).toContain('exactly four');
+  });
+
+  it('人像批要求每张都是同一个人，且不改变造型与场景', () => {
+    const p = buildSuitePortraitPrompt(2);
+    expect(p).toContain('Every shot must contain the same person');
+    expect(p).toContain('the first image in the image field');
+    expect(p).toContain('Do not change the person, outfit, hairstyle, scene, lighting setup or color grading');
+  });
+
+  it('配图批从底图取元素，四类取景齐全', () => {
+    const p = buildSuiteScenePrompt(2);
+    expect(p).toContain('outfit detail');
+    expect(p).toContain('food and table');
+    expect(p).toContain('environment wide');
+    expect(p).toContain('environment detail');
+    expect(p).toContain('do not place the person in the frame');
+  });
+
+  it('配图批：风格与底图同一次拍摄 + 去 AI 感硬约束', () => {
+    const p = buildSuiteScenePrompt(2);
+    expect(p).toContain('Same color temperature');
+    expect(p).toContain('real photograph rather than a rendered image');
+    expect(p).toContain('no text of any kind');
+    expect(p).toContain('no human face');
+    expect(p).toContain('no close-up of hands or fingers');
+    expect(p).toContain('never a face');
+    expect(p).toContain('no over-smoothing');
   });
 });

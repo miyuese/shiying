@@ -33,6 +33,13 @@ export const HOVER_DEBOUNCE_MS = 300;
 export const ANALYZE_TIMEOUT = 90000; // 90s：视觉模型「看图 + 最多 1200 token 详细描述」，经中转站常超 15s，给足时间（实测建议按 ×2 余量）
 // 生图超时：等「生图服务商返回结果」（同步中转站=等待生成完成）。实测中转站慢时 5~6 分钟，给足 7 分钟内的一半预算
 export const GENERATE_TIMEOUT = 400000;
+/**
+ * 人物卡「等响应头」单独上限（ms）：实测同一接口成功只需 26~35s。
+ * 服务商受理任务后如果失败却不回响应（连接挂着），旧逻辑要等满 400s，
+ * 再叠加一次自动重试 ≈ 13 分钟，用户侧表现为「一直生成中」。
+ * 这里按实测值留 4 倍余量，卡住就快速失败并换新连接重试。
+ */
+export const PERSON_CARD_SUBMIT_TIMEOUT = 120000;
 // 读取响应体（resp.json 之前的 body 流）超时：响应头到了但 body 迟迟不来时兜底
 export const BODY_READ_TIMEOUT = 60000;
 // 下载生成结果图（url → blob）超时：覆盖 headers 等待 + body 下载全过程

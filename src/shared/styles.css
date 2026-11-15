@@ -650,11 +650,132 @@ body::before {
   padding: 0 16px 16px;
   min-height: 0;
 }
-.result-bar {
+/* 生成结果抽屉：收起时只占一条窄条，点开向上展开 */
+.result-dock {
+  flex-shrink: 0;
   border-top: 1px solid var(--hairline);
   background: var(--bg-2);
-  padding: 12px 16px;
+}
+.result-dock:not(.has-result) {
+  display: none;
+}
+.dock-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--dur-2) var(--ease-out);
+}
+.result-dock.open .dock-panel {
+  /* 套图是四张横排 + 文字，比单图高，留足展开高度 */
+  max-height: 320px;
+}
+.dock-body {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px 0;
+}
+.dock-frame {
+  width: 92px;
+  height: 92px;
   flex-shrink: 0;
+}
+.dock-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* 套图：四张横排铺满一行，文字说明落到图下方 */
+.dock-body.is-suite {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.dock-suite {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.dock-suite .frame {
+  aspect-ratio: 3 / 4;
+}
+.dock-suite .frame-mark {
+  top: 4px;
+  left: 4px;
+  font-size: 7px;
+  padding: 1px 4px;
+}
+.dock-prompt {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 6px 0 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dock-actions {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 12px;
+}
+.dock-act {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 11px;
+  gap: 4px;
+}
+.dock-tab {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--ink-2);
+  transition: background var(--dur-2) var(--ease-out);
+}
+.dock-tab:hover {
+  background: var(--bg-3);
+}
+.dock-tab-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-3);
+  border: 0.5px solid var(--hairline);
+}
+.dock-tab-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.dock-tab-text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dock-caret {
+  display: flex;
+  color: var(--ink-3);
+  flex-shrink: 0;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.result-dock.open .dock-caret {
+  transform: rotate(180deg);
 }
 #app .banner-warn {
   margin: 8px 16px 4px;
@@ -867,53 +988,6 @@ body::before {
   background: var(--bg-3);
 }
 
-/* 结果胶片条 */
-.film-strip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-}
-.strip-thumb {
-  width: 52px;
-  height: 52px;
-  flex-shrink: 0;
-  border-radius: var(--r-sm);
-  background: var(--bg-3);
-  border: 0.5px solid var(--hairline);
-  overflow: hidden;
-  position: relative;
-}
-.strip-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.strip-info {
-  flex: 1;
-  min-width: 0;
-}
-.strip-title {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink-1);
-  margin: 0;
-}
-.strip-prompt {
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-  margin: 2px 0 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.strip-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
 /* 取景框 / 六宫格接触印 */
 .frame {
   position: relative;
@@ -975,6 +1049,17 @@ body::before {
   object-fit: cover;
   display: block;
 }
+/* 人物卡名称：点击就地改名 */
+.card-name {
+  cursor: text;
+  border-radius: 4px;
+  transition: color var(--dur-2) var(--ease-out);
+}
+.card-name:hover {
+  color: var(--blue-text);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
 .ratio-box {
   position: relative;
   width: 100%;
@@ -1020,10 +1105,9 @@ body::before {
 
 /* 全局任务进度条（固定底栏，taskProgress.ts） */
 .task-progress {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  /* 面板内流式布局：位于结果折叠条下方，不再 fixed 覆盖页面内容 */
+  position: relative;
+  flex-shrink: 0;
   z-index: var(--z-progress);
   padding: 12px 16px;
   border-top: 1px solid var(--hairline);

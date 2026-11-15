@@ -86,7 +86,7 @@ function renderCardList(container: HTMLElement): void {
         <div style="display:flex;align-items:center;gap:10px;">
           <div class="face-thumb" style="width:48px;height:48px;border-radius:10px;" data-thumb="${c.id}"></div>
           <div style="flex:1;min-width:0;">
-            <p style="font-size:13px;color:var(--ink-1);margin:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</p>
+            <p class="card-name" data-name="${c.id}" title="点击改名" style="font-size:13px;color:var(--ink-1);margin:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</p>
             <p style="font-size:10px;color:var(--ink-3);margin:2px 0 0;">${c.sourceCount} 张源图 · ${timeAgo(c.createdAt)}${c.isDefault ? ' · 默认' : ''}</p>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -125,6 +125,11 @@ function renderCardList(container: HTMLElement): void {
       const panel = (await import('../index')).panelApi;
       await panel.refreshPersonCards();
     });
+  });
+
+  // 改名：点名称就地变输入框，回车/失焦保存，Esc 取消
+  container.querySelectorAll<HTMLElement>('[data-name]').forEach((el) => {
+    el.addEventListener('click', () => startRename(el));
   });
 
   // 删除
@@ -170,6 +175,60 @@ function renderCardList(container: HTMLElement): void {
   });
 }
 
+/** 建议卡片名（与后台默认名规则一致），预填后用户可直接改 */
+function suggestCardName(): string {
+  return `人物卡 ${Date.now().toString(36).slice(-4).toUpperCase()}`;
+}
+
+/** 就地改名：名称元素原位替换为输入框（不弹窗、不新增按钮） */
+function startRename(el: HTMLElement): void {
+  if (el.querySelector('input')) return;
+  const id = el.dataset.name!;
+  const current = el.textContent ?? '';
+  const input = document.createElement('input');
+  input.className = 'input';
+  input.value = current;
+  input.maxLength = 30;
+  input.style.cssText = 'font-size:12px;padding:3px 6px;width:100%;height:24px;';
+  el.replaceChildren(input);
+  input.focus();
+  input.select();
+
+  let settled = false;
+  const finish = async (save: boolean) => {
+    if (settled) return;
+    settled = true;
+    const next = input.value.trim();
+    // 空名或未改动 → 直接还原，不发请求
+    if (!save || !next || next === current) {
+      el.textContent = current;
+      return;
+    }
+    try {
+      const res = await send<{ card: PersonCard }>('person-card-rename', { id, name: next });
+      el.textContent = res.card.name;
+      toast('已改名');
+      const panel = (await import('../index')).panelApi;
+      await panel.refreshPersonCards();
+    } catch (e) {
+      el.textContent = current;
+      toast((e as Error).message);
+    }
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void finish(true);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      void finish(false);
+    }
+  });
+  input.addEventListener('blur', () => void finish(true));
+  input.addEventListener('click', (e) => e.stopPropagation());
+}
+
 /** 新建人物卡弹窗（overlay + modal-sheet） */
 function openCreateCardModal(container: HTMLElement): void {
   const overlay = document.createElement('div');
@@ -185,7 +244,8 @@ function openCreateCardModal(container: HTMLElement): void {
         <p class="section-label">上传 1~${PERSON_CARD_MAX_SOURCES} 张人物照片</p>
         <div id="preview" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;"></div>
         <button class="btn btn-secondary btn-block" id="modal-pick" style="font-size:12px;margin-bottom:10px;">${iconSvg('plus', { size: 14, className: 'lucide' })} 选择照片</button>
-        <input class="input" id="modal-name" placeholder="卡片名称（可选）" style="margin-bottom:12px;">
+        <input class="input" id="modal-name" value="${suggestCardName()}" placeholder="给这张卡起个名字" maxlength="30" style="margin-bottom:4px;">
+        <p style="font-size:10px;color:var(--ink-3);margin:0 0 12px;">名称可以改成你自己的，之后也能点名字随时改</p>
         <button class="btn btn-primary btn-block" id="modal-create" style="padding:11px;">创建</button>
         <p style="font-size:10px;color:var(--ink-3);margin:10px 0 0;text-align:center;">创建后会自动提交生成标准三视图卡</p>
       </div>

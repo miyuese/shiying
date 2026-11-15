@@ -9,6 +9,10 @@ export interface PanelState {
   settings: Settings | null;
   /** 当前反推结果 */
   reversePrompt: string;
+  /** 提示词来源模式：AI 反推 / 自己写（自定义模式，不调用反推接口） */
+  promptMode: 'reverse' | 'custom';
+  /** 自定义模式下用户手写的提示词（与反推结果分开存，切换模式不互相污染） */
+  customPrompt: string;
   reverseProfileId: string;
   /** 当前选中的输入图 dataURL */
   selectedImage: string | null;
@@ -27,6 +31,8 @@ export interface PanelState {
   loading: boolean;
   /** 拍一套页本次选中的面部参考人物卡（默认不选，与全局 selectedCardId 解耦） */
   suiteCardId: string;
+  /** 拍一套配比：人像张数（0~4），其余为配图张数；默认 2+2 */
+  suitePortraitCount: number;
   /** 当前进行中的任务（用于全局进度提示） */
   activeTask: Task | null;
 }
@@ -35,6 +41,8 @@ export const initialState: PanelState = {
   tab: 'analyze',
   settings: null,
   reversePrompt: '',
+  promptMode: 'reverse',
+  customPrompt: '',
   reverseProfileId: 'preset-general-fast',
   selectedImage: null,
   selectedImageMeta: null,
@@ -46,6 +54,7 @@ export const initialState: PanelState = {
   results: [],
   loading: false,
   suiteCardId: '',
+  suitePortraitCount: 2,
   activeTask: null,
 };
 

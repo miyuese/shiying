@@ -12,6 +12,7 @@ import { getSettings } from '../settings';
 import {
   ASPECT_RATIOS,
   GENERATE_TIMEOUT,
+  PERSON_CARD_SUBMIT_TIMEOUT,
   BODY_READ_TIMEOUT,
   DOWNLOAD_TIMEOUT,
   POLL_INTERVAL,
@@ -19,7 +20,7 @@ import {
   QUALITY_TO_API,
 } from '../../shared/constants';
 import { composeFaceBadge } from '../../shared/utils/image';
-import { buildGeneratePrompt } from '../../shared/prompts';
+import { buildGeneratePrompt, buildSuitePortraitPrompt, buildSuiteScenePrompt } from '../../shared/prompts';
 import type { GenerateIntent } from '../../shared/types';
 import {
   apiFetch,
@@ -64,6 +65,12 @@ export async function generateImage(
     aspectRatio: string;
     /** 画质档位 '1K' | '2K' | '4K'；缺省/1K 保持现状（具体像素尺寸、不传 quality） */
     quality?: string;
+    /** 拍一套批次：portrait=人像批 / scene=配图批；缺省时走普通模板 */
+    suiteBatch?: 'portrait' | 'scene';
+    /** 拍一套本批张数（决定排布：1 张直出 / 2 张并排 / 3~4 张四宫格） */
+    suiteCount?: number;
+    /** 强制指定像素尺寸（拍一套的 3:2、3:4 不在 ASPECT_RATIOS 表里时用） */
+    sizeOverride?: string;
   },
   signal?: AbortSignal,
   onProgress?: (info: { percent: number; statusText?: string }) => void
@@ -77,15 +84,24 @@ export async function generateImage(
   // 2K/4K：按服务商文档走「画幅比例 + quality」精确映射到 1K/2K/4K
   // 1K / 缺省：完全保持现状（具体像素尺寸、不传 quality，兼容只认像素的服务商）
   const useRatioQuality = params.quality === '2K' || params.quality === '4K';
-  const size = useRatioQuality ? params.aspectRatio : (ASPECT_RATIOS[params.aspectRatio] ?? '1024x1024');
+  const size = params.sizeOverride
+    ?? (useRatioQuality ? params.aspectRatio : (ASPECT_RATIOS[params.aspectRatio] ?? '1024x1024'));
   const qualityApi = useRatioQuality ? QUALITY_TO_API[params.quality!] : undefined;
-  let finalPrompt = buildGeneratePrompt(params.intent, params.prompt);
+  // 拍一套分批：人像批 / 配图批各自一套模板（配图批由调用方不给 faceRef，避免静物格里冒出人）
+  let finalPrompt = params.suiteBatch
+    ? params.suiteBatch === 'portrait'
+      ? buildSuitePortraitPrompt(params.suiteCount ?? 1)
+      : buildSuiteScenePrompt(params.suiteCount ?? 1)
+    : buildGeneratePrompt(params.intent, params.prompt);
   const sourceBlobs = params.sourceBlobs?.length ? params.sourceBlobs : params.sourceBlob ? [params.sourceBlob] : [];
   const faceBlobs = params.faceBlobs?.length ? params.faceBlobs : params.faceBlob ? [params.faceBlob] : [];
   const hasSource = sourceBlobs.length > 0 || Boolean(params.sourceRef);
   const hasFace = faceBlobs.length > 0 || Boolean(params.faceRef);
   const multiImage = hasSource && hasFace;
-  if (params.intent === 'personCard' && sourceBlobs.length >= 2) {
+  // 拍一套的模板已经自带图序说明，不再叠加通用的「第一张/第二张」前缀，避免干扰排布指令
+  if (params.suiteBatch) {
+    // no-op
+  } else if (params.intent === 'personCard' && sourceBlobs.length >= 2) {
     // 人物卡多图：明确告知模型这些图都是同一个人，综合提取身份
     finalPrompt = `本次提交了 ${sourceBlobs.length} 张参考图（image 字段中的多张图片），这些图片均为同一个人（不同角度/场景/表情），请综合所有图片提取该人物稳定一致的面部身份，保证三视图之间身份一致。\n\n${finalPrompt}`;
   } else if (multiImage && faceBlobs.length >= 2) {
@@ -97,6 +113,24 @@ export async function generateImage(
   }
 
   const url = `${safeBase}/images/edits`;
+
+  /**
+   * 请求元信息：只用于出错时写进错误日志。
+   * 之前错误信息只有「请求超时（url）」，无法判断是发不出去、服务商不回话，
+   * 还是参数被拒——这里把模型/尺寸/图数/体积/提示词长度都带上。
+   */
+  const allBlobs = [...sourceBlobs, ...faceBlobs];
+  const refCount = (params.sourceRef ? 1 : 0) + (params.faceRef ? 1 : 0);
+  const imgCount = allBlobs.length > 0 ? allBlobs.length : refCount;
+  const totalBytes = allBlobs.reduce((n, b) => n + (b.size || 0), 0);
+  const sizeText = totalBytes >= 1048576
+    ? `${(totalBytes / 1048576).toFixed(1)}MB`
+    : `${Math.max(1, Math.round(totalBytes / 1024))}KB`;
+  const reqMeta = `model=${model} size=${size} images=${imgCount}(${sizeText}) prompt=${finalPrompt.length}字`;
+
+  // 等响应头的上限：人物卡按实测值收紧（失败能快些暴露），其余链路保持原有的长预算
+  const submitTimeout = params.intent === 'personCard' ? PERSON_CARD_SUBMIT_TIMEOUT : GENERATE_TIMEOUT;
+  const startedAt = Date.now();
 
   // 组装 multipart form
   const form = new FormData();
@@ -125,13 +159,33 @@ export async function generateImage(
   }
 
   onProgress?.({ percent: 25, statusText: '提交请求…' });
-  const resp = await apiFetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${safeKey}` },
-    body: form,
-  }, GENERATE_TIMEOUT, signal);
+  // 等待期间每 10s 刷新一次已等时长：服务商受理后不回话时，界面不再是纹丝不动的 25%
+  const ticker = setInterval(() => {
+    const s = Math.round((Date.now() - startedAt) / 1000);
+    onProgress?.({ percent: 25, statusText: `已提交，等待服务商返回（${s}s）` });
+  }, 10000);
+  let resp: Response;
+  try {
+    resp = await apiFetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${safeKey}` },
+      body: form,
+    }, submitTimeout, signal);
+  } catch (err) {
+    // 连响应头都没拿到：多半是服务商受理后不回话 / 连接已死。带上元信息与已等时长，便于定位
+    const e = err as ApiError;
+    const waited = Math.round((Date.now() - startedAt) / 1000);
+    throw new ApiError(
+      e.code ?? 'NETWORK',
+      `${e.message}｜${reqMeta}，已等 ${waited}s`,
+      e.status
+    );
+  } finally {
+    clearInterval(ticker);
+  }
 
   // 响应头已到（同步型中转站在这一步等待生成完成）；异步型中转站会很快返回任务 id
+  const headerMs = Date.now() - startedAt;
   onProgress?.({ percent: 30, statusText: '等待生成…' });
 
   // 响应体读取也有超时（响应头到了但 body 迟迟不流完时不会无限等）
@@ -149,7 +203,14 @@ export async function generateImage(
         faceBlob: faceBlobs[0],
       }, signal);
     }
-    throw classifyHttpError(resp.status, data);
+    // 附上请求元信息与响应体片段：错误日志里能直接看出是参数被拒还是别的原因
+    const httpErr = classifyHttpError(resp.status, data);
+    const bodyHead = JSON.stringify(data ?? {}).slice(0, 200);
+    throw new ApiError(
+      httpErr.code,
+      `${httpErr.message}｜${reqMeta}，用时 ${(headerMs / 1000).toFixed(1)}s，响应：${bodyHead}`,
+      httpErr.status
+    );
   }
 
   // 1) 同步返回 b64_json / url

@@ -165,7 +165,11 @@
     <div class="section-head">
       <span class="section-num">04</span>
       <p class="section-label" style="margin:0;">最近任务状态（诊断用）</p>
-      <button class="btn btn-secondary" id="btn-refresh-tasks" style="margin-left:auto;padding:4px 12px;font-size:11px;">刷新</button>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn btn-secondary" id="btn-refresh-tasks" style="padding:4px 12px;font-size:11px;">刷新</button>
+        <button class="btn btn-secondary" id="btn-unlock-tasks" title="把卡在「生成中」的任务直接判失败，解开人物卡/生图锁" style="padding:4px 12px;font-size:11px;">解锁</button>
+        <button class="btn btn-secondary" id="btn-clear-tasks" style="padding:4px 12px;font-size:11px;">清除</button>
+      </div>
     </div>
     <div id="task-log" class="log-box">
       <p style="color:var(--ink-3);">点击「刷新」查看任务状态</p>
@@ -176,7 +180,10 @@
     <div class="section-head">
       <span class="section-num">05</span>
       <p class="section-label" style="margin:0;">错误日志（诊断用）</p>
-      <button class="btn btn-secondary" id="btn-refresh-errors" style="margin-left:auto;padding:4px 12px;font-size:11px;">刷新</button>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn btn-secondary" id="btn-refresh-errors" style="padding:4px 12px;font-size:11px;">刷新</button>
+        <button class="btn btn-secondary" id="btn-clear-errors" style="padding:4px 12px;font-size:11px;">清除</button>
+      </div>
     </div>
     <div id="error-log" class="log-box">
       <p style="color:var(--ink-3);">点击「刷新」查看错误日志</p>

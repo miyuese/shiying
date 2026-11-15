@@ -105,12 +105,15 @@ export type MessageType =
   | 'person-card-delete'
   | 'person-card-set-default'
   | 'person-card-clear-error'
+  | 'person-card-rename'
   | 'person-card-get'
   | 'analyze-image'
   | 'generate-image'
   | 'task-status'
   | 'task-force-fail'
   | 'task-list'
+  | 'tasks-clear'
+  | 'task-force-unlock'
   | 'download-file'
   | 'open-panel'
   | 'open-panel-fallback'
@@ -146,7 +149,11 @@ export interface AnalyzePayload {
   profileId: ProfileId;
 }
 
-export type GenerateIntent = 'faceswap' | 'redraw' | 'suite' | 'personCard';
+/**
+ * 生图意图
+ * custom：自定义提示词模式——用户手写的提示词原样送出，不追加 REDRAW_GUIDE（任务类型仍记为 redraw）
+ */
+export type GenerateIntent = 'faceswap' | 'redraw' | 'suite' | 'personCard' | 'custom';
 
 export interface GeneratePayload {
   prompt: string;
@@ -169,6 +176,12 @@ export interface GeneratePayload {
   /** 多张人脸参考图 IndexedDB blobKey（persistRegenInputs 把 faceRefs 落盘后回填；优先于 faceBlobKey） */
   faceBlobKeys?: string[];
   aspectRatio: string;
+  /**
+   * 拍一套配比：人像张数 / 配图张数（合计 4）。
+   * 有值时后台拆成两批串行请求（人像批带人脸参考、配图批只带底图），结果合并进同一任务；
+   * 缺省时按旧的「4 张人像四宫格」处理。
+   */
+  suiteMix?: { portrait: number; scene: number };
   /** 画质档位（'1K' | '2K' | '4K'；缺省/1K 保持现状：具体像素尺寸、不传 quality） */
   quality?: string;
   /** 关联的人物卡 id（仅 intent=personCard 时使用） */
@@ -215,6 +228,12 @@ export interface PersonCardDeletePayload {
 
 export interface PersonCardSetDefaultPayload {
   id: string;
+}
+
+/** 人物卡改名 */
+export interface PersonCardRenamePayload {
+  id: string;
+  name: string;
 }
 
 export interface TestConnPayload {

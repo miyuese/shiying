@@ -121,8 +121,78 @@ Do not change the person, outfit, hairstyle, scene, lighting setup, color gradin
 The final result should have strong character consistency, strong scene consistency, strong lighting consistency, and strong color consistency, while still showing four distinct portrait moments from the same photoshoot.
 No text, no labels, no numbers, no watermark, no collage poster style, no extra people, no different person, no changed face, no changed hairstyle, no changed outfit, no changed accessories, no changed scene, no changed lighting, no dramatic style changes, no duplicated distorted faces, no deformed hands, no cropped head, no subject crossing between areas.`;
 
+/* ---------------- 拍一套：人像批 / 配图批 ---------------- */
+
+/** 单批张数决定排布：1 张直出、2 张左右并排（每格 3:4 竖图）、3~4 张走 2×2 四宫格 */
+export type SuiteLayout = 'single' | 'pair' | 'grid';
+
+export function suiteLayout(count: number): SuiteLayout {
+  if (count <= 1) return 'single';
+  if (count === 2) return 'pair';
+  return 'grid';
+}
+
+function layoutInstruction(count: number, subject: 'portrait' | 'scene'): string {
+  const layout = suiteLayout(count);
+  const noun = subject === 'portrait' ? 'portrait photographs of the same person' : 'close-up photographs';
+  if (layout === 'single') {
+    return `Produce one single vertical photograph, 3:4 aspect ratio, one shot only, full-bleed. ${
+      subject === 'portrait'
+        ? 'The frame holds one person only.'
+        : 'The frame holds one close-up subject only, no people.'
+    } No borders, no frames, no collage.`;
+  }
+  if (layout === 'pair') {
+    return `Produce one single image that contains exactly two ${noun} side by side, left and right, each occupying a 3:4 vertical frame. The left and right halves must show different moments, not the same photo twice. No visible divider line, no borders, no panel frames, no collage poster look. Each half must be a complete standalone photograph that can be cropped out separately. Nothing may cross the vertical center line.`;
+  }
+  return `Produce one single image that contains exactly four ${noun} arranged in a natural 2x2 grid. No visible divider lines, no borders, no panel frames, no collage poster look. Each area must be a complete standalone photograph that can be cropped out separately. Nothing may cross the internal horizontal or vertical center boundaries.`;
+}
+
+/**
+ * 拍一套 · 人像批
+ * 图序：第一张 = 底图（人 / 造型 / 场景 / 光线 / 色调 / 氛围），第二张起 = 同一人的面部身份参考
+ */
+export function buildSuitePortraitPrompt(count: number): string {
+  return `${layoutInstruction(count, 'portrait')}
+The first image (the first image in the image field) is the base reference: it defines the person, hairstyle, outfit, accessories, body proportions, age impression, scene, environment, lighting, color tone, and overall mood of the photoshoot. If additional face reference images (the second and subsequent images in the image field, photos of the same person) are provided, use them only as a light facial-identity guide: keep the same person's face, without over-locking facial details.
+Every shot must contain the same person. Identity, hairstyle, hair color, outfit, accessories, body proportions, environment, lighting, color tone, image texture and photographic style must stay consistent with the base reference.
+These must feel like real, lively moments from an actual photoshoot — natural, expressive, a little spontaneous, with the atmosphere of a fashionable short-video shoot, never stiff, posed, or repetitive. Vary pose, body angle, gaze direction, hand gesture, composition, framing, camera distance and camera angle naturally. Front view, three-quarter view, profile view or back view are only examples, not a fixed checklist: let the mood of the base reference decide what fits.
+Do not change the person, outfit, hairstyle, scene, lighting setup or color grading. Only vary natural photographic elements such as pose, angle, gesture, composition and framing.
+No text, no labels, no numbers, no watermark, no logo, no collage poster style, no extra people, no different person, no changed face, no changed hairstyle, no changed outfit, no changed scene, no dramatic style change, no deformed hands, no cropped head, no subject crossing between areas.`;
+}
+
+/**
+ * 拍一套 · 配图批（非人物特写）
+ * 图序：只带底图，不带人脸参考 —— 否则静物格里会冒出那个人
+ * 目标：补齐朋友圈配图（穿搭 / 美食 / 环境全景 / 环境细节），风格与底图同一次拍摄
+ */
+export function buildSuiteScenePrompt(count: number): string {
+  const pick =
+    count <= 1
+      ? 'Pick the single most fitting subject'
+      : `Pick the ${count} most fitting subjects, each a different one`;
+  return `${layoutInstruction(count, 'scene')}
+The first image (the first image in the image field) is a styling and atmosphere reference for a set of social-media companion photos. Do not copy it literally, and do not place the person in the frame. Extract from it the outfit, the objects on the scene, the space, the materials, the direction of light, the color grading and the mood, then build genuine close-up photographs of those elements.
+${pick} from these categories, choosing freely based on what the reference actually contains:
+- outfit detail: fabric, sleeve, cuff, hem, shoes, bag, accessories, material texture
+- food and table: plate, cup, cutlery, dessert, drink, table surface
+- environment wide: the whole space, interior, street, room, with real depth
+- environment detail: window light, wall texture, plants, lamps, shadows falling on a surface
+Frame every shot as a real close-up or detail shot taken during the same photoshoot, as if with the same camera and lens moments before or after the portraits. Same color temperature, same light direction, same color grading, same depth-of-field character as the reference, so the whole set looks like one coherent shoot.
+Make it read as a real photograph rather than a rendered image. Keep the imperfections that make photos real: fabric wrinkles, small scratches on a table, natural reflections on glass, slight grain, shallow depth of field with natural bokeh, slight asymmetry, uneven natural light.
+Absolute restrictions:
+- no text of any kind: no signs, menus, labels, packaging text, screen content, book pages, watermarks, logos or brand marks
+- no human face, no full face, no group of people, no crowd, and no face reflected in mirrors, glass or water
+- no close-up of hands or fingers
+A human presence is allowed only as a clothing or body fragment (a sleeve, a hem, a shoulder, a leg, a silhouette from behind), never a face.
+Never fully symmetric, never perfectly even lighting, no over-saturation, no over-smoothing, no CG look, no 3D render look, no plastic texture, no stock-photo perfection, no poster layout, no decorative graphics.`;
+}
+
 /** 按意图组装最终 prompt */
-export function buildGeneratePrompt(intent: 'faceswap' | 'redraw' | 'suite' | 'personCard', reversePrompt: string): string {
+export function buildGeneratePrompt(
+  intent: 'faceswap' | 'redraw' | 'suite' | 'personCard' | 'custom',
+  reversePrompt: string
+): string {
   switch (intent) {
     case 'faceswap':
       return buildFaceswapPrompt(reversePrompt);
@@ -132,5 +202,9 @@ export function buildGeneratePrompt(intent: 'faceswap' | 'redraw' | 'suite' | 'p
       return SUITE_PROMPT_TEMPLATE;
     case 'personCard':
       return PERSON_CARD_PROMPT;
+    case 'custom':
+      // 自定义模式：用户手写的提示词原样送出，不拼任何模板。
+      // 多图时「第一张=构图、第二张起=人脸」的图序说明由 provider 按实际图片数量自动补，不需要写死在这里。
+      return reversePrompt;
   }
 }

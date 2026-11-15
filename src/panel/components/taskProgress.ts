@@ -61,7 +61,8 @@ export function renderTaskProgressBar(): void {
     el = document.createElement('div');
     el.id = containerId;
     el.className = 'task-progress';
-    document.body.appendChild(el);
+    // 挂到 #app 内（流式布局）：固定定位会盖住底部的结果折叠条
+    (document.getElementById('app') ?? document.body).appendChild(el);
   }
 
   const t = s.activeTask;
@@ -77,7 +78,7 @@ export function renderTaskProgressBar(): void {
       <div class="tp-row">
         ${iconSvg('check', { size: 14, className: 'lucide ok' })}
         <span class="tp-title ok">${label}完成</span>
-        <span class="tp-hint auto">结果已生成，可在「最近任务」查看</span>
+        <span class="tp-hint auto">结果已生成，可在下方「生成结果」查看</span>
       </div>`;
     // 2.5 秒后自动消失
     setTimeout(() => {
@@ -88,12 +89,12 @@ export function renderTaskProgressBar(): void {
   }
 
   if (t.status === 'failed') {
-    // 失败不自动消失：错误原因需要时间阅读，由用户手动关闭（下一次任务提交也会自然覆盖）
+    // 失败原因不在工作台常驻展示（统一到设置页诊断区查看），这里只给状态 + 去处
     el.innerHTML = `
       <div class="tp-row" style="align-items:flex-start;">
         ${iconSvg('alert-triangle', { size: 14, className: 'lucide err' })}
         <span class="tp-title err">${label}失败</span>
-        <span class="tp-hint auto" style="opacity:.85;flex:1;">${t.error ? escapeHtml(t.error) : '未知错误'}</span>
+        <span class="tp-hint auto" style="opacity:.85;flex:1;">原因可在设置页日志查看</span>
         <button class="icon-btn" data-tp-close title="关闭">${iconSvg('x', { size: 13, className: 'lucide' })}</button>
       </div>`;
     el.querySelector<HTMLElement>('[data-tp-close]')?.addEventListener('click', () => {
@@ -147,7 +148,7 @@ export function renderInlineProgress(
       <div class="card" style="padding:12px;display:flex;align-items:center;gap:8px;">
         ${iconSvg('check', { size: 15, className: 'lucide ok' })}
         <span style="font-size:12px;color:var(--green);font-weight:500;">${label}完成</span>
-        <span style="font-size:11px;color:var(--ink-3);margin-left:auto;">结果已生成，可在「最近任务」查看</span>
+        <span style="font-size:11px;color:var(--ink-3);margin-left:auto;">结果已生成，可在下方「生成结果」查看</span>
       </div>`;
     return;
   }
@@ -156,7 +157,8 @@ export function renderInlineProgress(
     container.innerHTML = `
       <div class="card" style="padding:12px;display:flex;align-items:flex-start;gap:8px;">
         ${iconSvg('alert-triangle', { size: 15, className: 'lucide err' })}
-        <span style="font-size:12px;color:var(--red);font-weight:500;flex:1;">${label}失败：${task.error ?? '未知错误'}</span>
+        <span style="font-size:12px;color:var(--red);font-weight:500;flex:1;">${label}失败</span>
+        <span style="font-size:11px;color:var(--ink-3);">原因见设置页日志</span>
       </div>`;
     return;
   }

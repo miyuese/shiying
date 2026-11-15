@@ -16,19 +16,19 @@ export const MAX_DIRECT_FACE_IMAGES = 2;
 
 export function renderFaceReferenceSelector(
   container: HTMLElement,
-  opts: { suiteMode?: boolean } = {}
+  opts: { suiteMode?: boolean; optional?: boolean } = {}
 ): void {
   const s = getState();
   if (s.directFaceImages.length > 0) {
     renderPhotosMode(container, Boolean(opts.suiteMode));
   } else {
-    renderCardMode(container, Boolean(opts.suiteMode));
+    renderCardMode(container, Boolean(opts.suiteMode), Boolean(opts.optional));
   }
 }
 
 /* ---------------- 人物卡模式 ---------------- */
 
-function renderCardMode(container: HTMLElement, suiteMode: boolean): void {
+function renderCardMode(container: HTMLElement, suiteMode: boolean, optional: boolean): void {
   const s = getState();
   const cards = s.personCards;
   const selectedId = suiteMode ? s.suiteCardId : s.selectedCardId;
@@ -53,7 +53,11 @@ function renderCardMode(container: HTMLElement, suiteMode: boolean): void {
     ? selectedId
       ? `已选 <strong class="num" style="color:var(--ink-1);">${cards.find((c) => c.id === selectedId)?.name ?? '人物卡'}</strong>，再点一下可取消`
       : '默认不选 · 点卡片选中，再点一下取消'
-    : '点击卡片选择面部参考';
+    : optional
+      ? selectedId
+        ? `已选 <strong class="num" style="color:var(--ink-1);">${cards.find((c) => c.id === selectedId)?.name ?? '人物卡'}</strong>，再点一下取消 · 不选也能生成`
+        : '可选 · 不选就只用底图 + 提示词生成'
+      : '点击卡片选择面部参考';
 
   container.innerHTML = `
     <p class="micro" style="margin-bottom:8px;">${hint}</p>
@@ -80,6 +84,9 @@ function renderCardMode(container: HTMLElement, suiteMode: boolean): void {
     el.addEventListener('click', () => {
       if (suiteMode) {
         setState({ suiteCardId: getState().suiteCardId === id ? '' : id });
+      } else if (optional) {
+        // 可选模式（自定义提示词）：再点已选卡片即取消，允许完全不使用面部参考
+        setState({ selectedCardId: getState().selectedCardId === id ? '' : id });
       } else {
         setState({ selectedCardId: id });
       }
