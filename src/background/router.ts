@@ -139,13 +139,16 @@ async function handle(msg: MsgEnvelope): Promise<unknown> {
     }
     case 'person-card-create': {
       const p = msg.payload as PersonCardCreatePayload;
-      // 锁：同一时间只允许一张人物卡在生成（避免多卡并发时任务归属混乱）
-      if (await hasActiveTaskOfType('personCard')) throw new Error('PERSON_CARD_BUSY');
-      const result = await personCards.createPersonCard(p.images ?? [], p.name, p.blobKeys);
-      // 立刻异步触发三视图卡生成（不阻塞 UI）。
+      // 锁：同一时间只允许一张人物卡在生成（避免多卡并发时任务归属混乱）。
+      // 导入成品卡不产生生成任务，不需要排队等别人生成完。
+      if (!p.skipGenerate && (await hasActiveTaskOfType('personCard'))) throw new Error('PERSON_CARD_BUSY');
+      const result = await personCards.createPersonCard(p.images ?? [], p.name, p.blobKeys, {
+        skipGenerate: p.skipGenerate,
+      });
+      // 立刻异步触发三视图卡生成（不阻塞 UI）。导入的成品卡跳过这一步。
       // 全部源图 Blob 直传：卡上的所有源图都作为身份参考（多角度综合，相似度更稳），不复制临时图，不压缩。
       const sourceKeys = result.blobKeys;
-      if (result.card && sourceKeys.length > 0) {
+      if (!p.skipGenerate && result.card && sourceKeys.length > 0) {
         const inputs: GeneratePayload = {
           intent: 'personCard',
           prompt: '',

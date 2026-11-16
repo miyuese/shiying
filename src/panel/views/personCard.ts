@@ -13,6 +13,7 @@ import { PERSON_CARD_MAX_SOURCES } from '../../shared/constants';
 import { genId } from '../../shared/utils/image';
 // 面板与 background 同源，直接写同一个 IndexedDB（原图直传：Blob 入库 → 只传 key，不压缩不转 dataURL）
 import { putImage, deleteImage } from '../../background/store/db';
+import { importPersonCard, exportPersonCard } from '../components/personCardIO';
 
 export function renderPersonCardView(container: HTMLElement): void {
   const s = getState();
@@ -20,8 +21,11 @@ export function renderPersonCardView(container: HTMLElement): void {
   container.innerHTML = `
     <div style="padding-top:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <p class="section-label" style="margin:0;">人物卡 · 人脸参考资产</p>
-        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" id="btn-new">${iconSvg('plus', { size: 14, className: 'lucide' })} 新建人物卡</button>
+        <p class="section-label" style="margin:0;">人物卡</p>
+        <div style="display:flex;gap:6px;flex-shrink:0;">
+          <button class="btn btn-secondary" style="padding:6px 10px;font-size:12px;" id="btn-import" title="导入已有的三视图卡图（换设备/重装后用）">${iconSvg('upload', { size: 14, className: 'lucide' })} 导入</button>
+          <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;" id="btn-new">${iconSvg('plus', { size: 14, className: 'lucide' })} 新建</button>
+        </div>
       </div>
 
       <div id="card-list"></div>
@@ -33,6 +37,15 @@ export function renderPersonCardView(container: HTMLElement): void {
   container.querySelector('#btn-new')!.addEventListener('click', () => {
     openCreateCardModal(container);
   });
+  container.querySelector('#btn-import')!.addEventListener('click', () => void runImport());
+}
+
+/** 导入成品卡（图本身就是三视图卡）：入库后与「生成成功」的卡完全同构 */
+async function runImport(): Promise<void> {
+  const card = await importPersonCard();
+  if (!card) return;
+  const panel = (await import('../index')).panelApi;
+  await panel.refreshPersonCards();
 }
 
 function renderCardList(container: HTMLElement): void {
@@ -69,13 +82,17 @@ function renderCardList(container: HTMLElement): void {
       <div class="empty">
         <div class="empty-icon">${iconSvg('user-round', { size: 22, className: 'lucide' })}</div>
         <p>还没有人物卡</p>
-        <p style="font-size:11px;margin-top:4px;">上传 1~${PERSON_CARD_MAX_SOURCES} 张人物照片，生成标准三视图身份卡</p>
-        <button class="btn btn-secondary" style="margin-top:12px;font-size:12px;" id="empty-new">去创建</button>
+        <p style="font-size:11px;margin-top:4px;">上传 1~${PERSON_CARD_MAX_SOURCES} 张人物照片生成三视图卡，或直接导入已有的卡图</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">
+          <button class="btn btn-secondary" style="font-size:12px;" id="empty-import">${iconSvg('upload', { size: 14, className: 'lucide' })} 导入卡图</button>
+          <button class="btn btn-secondary" style="font-size:12px;" id="empty-new">去创建</button>
+        </div>
       </div>
     `;
     container.querySelector('#empty-new')?.addEventListener('click', () => {
       openCreateCardModal(container);
     });
+    container.querySelector('#empty-import')?.addEventListener('click', () => void runImport());
     return;
   }
 
@@ -87,9 +104,10 @@ function renderCardList(container: HTMLElement): void {
           <div class="face-thumb" style="width:48px;height:48px;border-radius:10px;" data-thumb="${c.id}"></div>
           <div style="flex:1;min-width:0;">
             <p class="card-name" data-name="${c.id}" title="点击改名" style="font-size:13px;color:var(--ink-1);margin:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</p>
-            <p style="font-size:10px;color:var(--ink-3);margin:2px 0 0;">${c.sourceCount} 张源图 · ${timeAgo(c.createdAt)}${c.isDefault ? ' · 默认' : ''}</p>
+            <p style="font-size:10px;color:var(--ink-3);margin:2px 0 0;">${c.sourceCount > 0 ? `${c.sourceCount} 张源图` : '成品卡图'} · ${timeAgo(c.createdAt)}${c.isDefault ? ' · 默认' : ''}</p>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button class="icon-btn" data-export="${c.id}" title="导出卡图（换设备后可重新导入）">${iconSvg('download', { size: 14, className: 'lucide' })}</button>
             ${c.isDefault ? '' : `<button class="icon-btn" data-default="${c.id}" title="设为默认">${iconSvg('star', { size: 14, className: 'lucide' })}</button>`}
             <button class="icon-btn" data-del="${c.id}" title="删除">${iconSvg('trash-2', { size: 14, className: 'lucide' })}</button>
           </div>
@@ -115,6 +133,15 @@ function renderCardList(container: HTMLElement): void {
         el.innerHTML = `<img src="${r.dataUrl}" data-preview="1" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
       })
       .catch(() => {});
+  });
+
+  // 导出卡图：下载的就是这张卡被调用时用的那张图
+  container.querySelectorAll<HTMLElement>('[data-export]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.export!;
+      const card = getState().personCards.find((c) => c.id === id);
+      void exportPersonCard(id, card?.name ?? 'card');
+    });
   });
 
   // 设默认

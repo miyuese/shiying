@@ -28,7 +28,7 @@ export interface PersonCard {
   name: string;
   /** IndexedDB 图片 blob 引用 key */
   blobKeys: string[];
-  /** 建卡用了几张源图 */
+  /** 建卡用了几张源图（导入的成品卡为 0） */
   sourceCount: number;
   isDefault: boolean;
   createdAt: number;
@@ -220,6 +220,12 @@ export interface PersonCardCreatePayload {
   /** 已由面板存入 IndexedDB 的源图 blobKey 列表（优先于 images） */
   blobKeys?: string[];
   name?: string;
+  /**
+   * 导入成品卡（设备迁移场景）：上传的图本身就是成品三视图卡，
+   * 只入库、不触发三视图生成，sourceCount 记为 0。
+   * 仅用于创建这一个动作，不落库——导入的卡与生成的卡在数据上完全同构。
+   */
+  skipGenerate?: boolean;
 }
 
 export interface PersonCardDeletePayload {

@@ -30,11 +30,14 @@ export async function getPersonCard(id: string): Promise<PersonCard | undefined>
  * 创建人物卡：
  * - 新路径：面板已把源图 Blob 存入 IndexedDB，直接沿用其 blobKeys（原图直传，不压缩）
  * - 旧路径：传 dataURL 列表，这里转 Blob 入库（兼容）
+ * - opts.skipGenerate（导入成品卡）：图本身就是成品三视图卡，sourceCount 记 0，
+ *   于是 blobKeys.length > sourceCount 天然成立——卡与「生成成功」的卡同构，下游零分支
  */
 export async function createPersonCard(
   images: string[],
   name?: string,
-  blobKeys?: string[]
+  blobKeys?: string[],
+  opts: { skipGenerate?: boolean } = {}
 ): Promise<{ card: PersonCard; blobKeys: string[] }> {
   const all = await getAll();
   if (all.length >= PERSON_CARD_MAX_COUNT) {
@@ -64,7 +67,8 @@ export async function createPersonCard(
     id,
     name: name?.trim() || `人物卡 ${now.toString(36).slice(-4).toUpperCase()}`,
     blobKeys: keys,
-    sourceCount: keys.length,
+    // 导入的卡没有「源图」，全部 key 都是成品卡图
+    sourceCount: opts.skipGenerate ? 0 : keys.length,
     isDefault: !hasDefault,
     createdAt: now,
   };

@@ -9,6 +9,7 @@
 import { getState, setState } from '../state';
 import { send, toast } from '../ui';
 import { iconSvg } from '../../shared/icons';
+import { importPersonCard } from './personCardIO';
 import type { PersonCard } from '../../shared/types';
 
 /** 直接上传面部参考照片上限 */
@@ -40,10 +41,18 @@ function renderCardMode(container: HTMLElement, suiteMode: boolean, optional: bo
         <span style="font-size:12px;color:var(--ink-3);">还没有人物卡</span>
         <button class="link" id="go-create-card">去创建 →</button>
       </div>
-      <button class="chip" id="use-photos" style="margin-top:8px;">或直接传 1~2 张照片做面部参考 →</button>
+      <button class="chip" id="import-card" style="margin-top:8px;">${iconSvg('upload', { size: 12, className: 'lucide' })} 或导入已有三视图卡图 →</button>
+      <button class="chip" id="use-photos" style="margin-top:6px;">或直接传 1~2 张照片做面部参考 →</button>
     `;
     container.querySelector('#go-create-card')!.addEventListener('click', () => {
       setState({ tab: 'personCard' });
+    });
+    container.querySelector('#import-card')!.addEventListener('click', async () => {
+      const card = await importPersonCard();
+      if (!card) return;
+      const panel = (await import('../index')).panelApi;
+      await panel.refreshPersonCards();
+      setState({ directFaceImages: [], selectedCardId: card.id, suiteCardId: card.id });
     });
     container.querySelector('#use-photos')!.addEventListener('click', () => void pickPhoto());
     return;
@@ -70,7 +79,7 @@ function renderCardMode(container: HTMLElement, suiteMode: boolean, optional: bo
           <div class="face-thumb" style="width:36px;height:36px;" data-card-thumb="${c.id}"></div>
           <div style="flex:1;min-width:0;">
             <p style="font-size:12px;color:var(--ink-1);margin:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</p>
-            <p style="font-size:10px;color:var(--ink-3);margin:0;">${c.sourceCount} 张源图${c.isDefault ? ' · 默认' : ''}</p>
+            <p style="font-size:10px;color:var(--ink-3);margin:0;">${c.sourceCount > 0 ? `${c.sourceCount} 张源图` : '成品卡图'}${c.isDefault ? ' · 默认' : ''}</p>
           </div>
           ${c.isDefault ? '<span class="pill pill-blue">默认</span>' : ''}
         </div>`
